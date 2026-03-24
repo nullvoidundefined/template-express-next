@@ -133,8 +133,7 @@ describe("auth handlers", () => {
     it("returns 200 and sets cookie when valid", async () => {
       vi.mocked(authRepo.findUserByEmail).mockResolvedValueOnce(mockUser);
       vi.mocked(authRepo.verifyPassword).mockResolvedValueOnce(true);
-      vi.mocked(authRepo.deleteSessionsForUser).mockResolvedValueOnce();
-      vi.mocked(authRepo.createSession).mockResolvedValueOnce("session-id");
+      vi.mocked(authRepo.loginUser).mockResolvedValueOnce("session-id");
 
       const res = await request(app)
         .post("/login")
@@ -147,8 +146,7 @@ describe("auth handlers", () => {
         created_at: "2025-01-01T00:00:00.000Z",
       });
       expect(res.headers["set-cookie"]).toBeDefined();
-      expect(authRepo.deleteSessionsForUser).toHaveBeenCalledWith(id);
-      expect(authRepo.createSession).toHaveBeenCalledWith(id);
+      expect(authRepo.loginUser).toHaveBeenCalledWith(id);
     });
     it("returns 500 when repo throws", async () => {
       vi.mocked(authRepo.findUserByEmail).mockRejectedValueOnce(new Error("DB error"));

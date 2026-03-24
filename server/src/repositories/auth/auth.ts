@@ -7,7 +7,7 @@ import { query, withTransaction } from "app/db/pool/pool.js";
 import type { PoolClient } from "app/db/pool/pool.js";
 import type { User } from "app/schemas/auth.js";
 
-const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 12;
 
 /** Hash session token for storage. Cookie holds raw token; DB holds hash so a dump doesn't expose sessions. */
 function hashSessionToken(token: string): string {
@@ -92,6 +92,22 @@ export async function deleteSessionsForUser(userId: string): Promise<void> {
  * Avoids the 23505 race where createUser succeeds but createSession fails, leaving an orphan user.
  * Throws with code "23505" when email is already registered.
  */
+export async function deleteExpiredSessions(): Promise<number> {
+  const result = await query("DELETE FROM sessions WHERE expires_at <= NOW() RETURNING id");
+  return result.rowCount ?? 0;
+}
+
+/**
+ * Deletes existing sessions and creates a new one in a single transaction.
+ * Mirrors createUserAndSession — ensures login never leaves the user with a dangling session.
+ */
+export async function loginUser(userId: string): Promise<string> {
+  return withTransaction(async (client) => {
+    await query("DELETE FROM sessions WHERE user_id = $1", [userId], client);
+    return createSession(userId, client);
+  });
+}
+
 export async function createUserAndSession(
   email: string,
   password: string,
