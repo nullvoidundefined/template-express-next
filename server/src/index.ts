@@ -15,6 +15,7 @@ import { notFoundHandler } from "app/middleware/notFoundHandler/notFoundHandler.
 import { rateLimiter } from "app/middleware/rateLimiter/rateLimiter.js";
 import { requestLogger } from "app/middleware/requestLogger/requestLogger.js";
 import { loadSession } from "app/middleware/requireAuth/requireAuth.js";
+import { deleteExpiredSessions } from "app/repositories/auth/auth.js";
 import { authRouter } from "app/routes/auth.js";
 import { logger } from "app/utils/logs/logger.js";
 
@@ -31,6 +32,8 @@ function validateEnv(): void {
 
 const app = express();
 const REQUEST_TIMEOUT_MS = 30_000;
+const SHUTDOWN_TIMEOUT_MS = 10_000;
+const SESSION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 // Trust the first hop (reverse proxy / load balancer) so req.ip, req.protocol, and rate limiting work
 // correctly with X-Forwarded-For / X-Forwarded-Proto headers. Set to the number of trusted proxy hops.
@@ -59,31 +62,47 @@ app.use(cookieParser());
 // Require X-Requested-With on state-changing requests to mitigate CSRF.
 app.use(csrfGuard);
 
-// Load session from cookie and set req.user when valid (does not block unauthenticated requests).
-app.use(loadSession);
-
 // Timeout long-running requests so hung connections don't stay open indefinitely.
-app.use((_req, res, next) => {
+app.use((req, res, next) => {
   res.setTimeout(REQUEST_TIMEOUT_MS, () => {
     if (!res.headersSent) {
       res.status(408).json({ error: { message: "Request timeout" } });
     }
+    req.destroy();
   });
   next();
+});
+
+// Health check — placed before loadSession to avoid unnecessary DB session lookups.
+let healthCacheResult: { status: string; db: string } | null = null;
+let healthCacheExpiry = 0;
+const HEALTH_CACHE_TTL_MS = 5_000;
+
+app.get("/health", async (_req, res) => {
+  const now = Date.now();
+  if (healthCacheResult && now < healthCacheExpiry) {
+    const statusCode = healthCacheResult.db === "connected" ? 200 : 503;
+    res.status(statusCode).json(healthCacheResult);
+    return;
+  }
+  try {
+    await query("SELECT 1");
+    healthCacheResult = { status: "ok", db: "connected" };
+    healthCacheExpiry = now + HEALTH_CACHE_TTL_MS;
+    res.status(200).json(healthCacheResult);
+  } catch {
+    healthCacheResult = { status: "degraded", db: "disconnected" };
+    healthCacheExpiry = now + HEALTH_CACHE_TTL_MS;
+    res.status(503).json(healthCacheResult);
+  }
 });
 
 query("SELECT NOW()")
   .then(() => logger.info("Connected to database"))
   .catch((err: unknown) => logger.error({ err }, "Database connection failed"));
 
-app.get("/health", async (_req, res) => {
-  try {
-    await query("SELECT 1");
-    res.status(200).json({ status: "ok", db: "connected" });
-  } catch {
-    res.status(503).json({ status: "degraded", db: "disconnected" });
-  }
-});
+// Load session from cookie and set req.user when valid (does not block unauthenticated requests).
+app.use(loadSession);
 
 app.use("/auth", authRouter);
 
@@ -119,8 +138,27 @@ if (isEntryModule) {
 
   const server = app.listen(PORT, HOST, () => logger.info({ port: PORT }, "Server running"));
 
+  // Periodically clean up expired sessions to prevent table bloat.
+  const cleanupTimer = setInterval(async () => {
+    try {
+      const count = await deleteExpiredSessions();
+      if (count > 0) logger.info({ count }, "Cleaned up expired sessions");
+    } catch (err) {
+      logger.error({ err }, "Failed to clean up expired sessions");
+    }
+  }, SESSION_CLEANUP_INTERVAL_MS);
+  cleanupTimer.unref();
+
   async function shutdown(signal: string) {
     logger.info({ signal }, "Shutting down gracefully");
+
+    const forceExit = setTimeout(() => {
+      logger.error("Graceful shutdown timed out – forcing exit");
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+    forceExit.unref();
+
+    clearInterval(cleanupTimer);
     await new Promise<void>((resolve) => server.close(() => resolve()));
     logger.info("HTTP server closed");
     await pool.end();

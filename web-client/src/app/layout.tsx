@@ -28,8 +28,11 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body className={`${geistSans.variable} ${geistMono.variable}`}>
-                <nav>
+                <nav style={{ padding: '1rem', display: 'flex', gap: '1rem' }}>
+                    <Link href="/">Home</Link>
                     <Link href="/account">Account</Link>
+                    <Link href="/login">Login</Link>
+                    <Link href="/register">Register</Link>
                 </nav>
                 {children}
             </body>

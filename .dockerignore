@@ -1,0 +1,12 @@
+node_modules
+.git
+.env
+.env.local
+.env.*.local
+server/dist
+server/coverage
+server/node_modules
+web-client/.next
+web-client/node_modules
+coverage
+*.log

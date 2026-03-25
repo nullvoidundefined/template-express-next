@@ -12,6 +12,14 @@ const app = express();
 app.get("/boom", (_req: Request, _res: Response, next: NextFunction) => {
   next(new Error("kaboom"));
 });
+app.get("/status-error", (_req: Request, _res: Response, next: NextFunction) => {
+  const err = Object.assign(new Error("not found"), { status: 404 });
+  next(err);
+});
+app.get("/status-code-error", (_req: Request, _res: Response, next: NextFunction) => {
+  const err = Object.assign(new Error("bad request"), { statusCode: 400 });
+  next(err);
+});
 app.use(errorHandler);
 
 describe("errorHandler", () => {
@@ -29,11 +37,35 @@ describe("errorHandler", () => {
     expect(res.body.error.message).toContain("kaboom");
   });
 
-  it("hides error detail in production", async () => {
+  it("hides error detail in production for 500 errors", async () => {
     process.env.NODE_ENV = "production";
     const res = await request(app).get("/boom");
 
     expect(res.status).toBe(500);
     expect(res.body.error.message).toBe("Internal server error");
+  });
+
+  it("respects err.status when present", async () => {
+    process.env.NODE_ENV = "development";
+    const res = await request(app).get("/status-error");
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe("not found");
+  });
+
+  it("respects err.statusCode when present", async () => {
+    process.env.NODE_ENV = "development";
+    const res = await request(app).get("/status-code-error");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toBe("bad request");
+  });
+
+  it("shows error message for non-500 errors even in production", async () => {
+    process.env.NODE_ENV = "production";
+    const res = await request(app).get("/status-error");
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe("not found");
   });
 });

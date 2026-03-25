@@ -87,27 +87,29 @@ export async function deleteSessionsForUser(userId: string): Promise<void> {
   await query("DELETE FROM sessions WHERE user_id = $1", [userId]);
 }
 
-/**
- * Creates a user and their first session in a single transaction.
- * Avoids the 23505 race where createUser succeeds but createSession fails, leaving an orphan user.
- * Throws with code "23505" when email is already registered.
- */
+/** Removes expired sessions. Call on an interval to prevent table bloat. */
 export async function deleteExpiredSessions(): Promise<number> {
   const result = await query("DELETE FROM sessions WHERE expires_at <= NOW() RETURNING id");
   return result.rowCount ?? 0;
 }
 
-/**
- * Deletes existing sessions and creates a new one in a single transaction.
- * Mirrors createUserAndSession — ensures login never leaves the user with a dangling session.
- */
+/** Creates a new session, pruning only expired sessions for this user. Allows concurrent sessions. */
 export async function loginUser(userId: string): Promise<string> {
   return withTransaction(async (client) => {
-    await query("DELETE FROM sessions WHERE user_id = $1", [userId], client);
+    await query(
+      "DELETE FROM sessions WHERE user_id = $1 AND expires_at <= NOW()",
+      [userId],
+      client,
+    );
     return createSession(userId, client);
   });
 }
 
+/**
+ * Creates a user and their first session in a single transaction.
+ * Avoids the race where createUser succeeds but createSession fails, leaving an orphan user.
+ * Throws with code "23505" when email is already registered.
+ */
 export async function createUserAndSession(
   email: string,
   password: string,

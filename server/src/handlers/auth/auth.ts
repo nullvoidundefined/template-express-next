@@ -6,13 +6,15 @@ import * as authRepo from "app/repositories/auth/auth.js";
 import { loginSchema, registerSchema } from "app/schemas/auth.js";
 import { logger } from "app/utils/logs/logger.js";
 
-const SESSION_COOKIE_OPTIONS = {
-  httpOnly: true,
-  maxAge: SESSION_TTL_MS,
-  path: "/",
-  sameSite: "lax" as const,
-  secure: isProduction(),
-};
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    maxAge: SESSION_TTL_MS,
+    path: "/",
+    sameSite: "lax" as const,
+    secure: isProduction(),
+  };
+}
 
 export async function register(req: Request, res: Response): Promise<void> {
   const parsed = registerSchema.safeParse(req.body);
@@ -25,7 +27,7 @@ export async function register(req: Request, res: Response): Promise<void> {
   try {
     const { user, sessionId } = await authRepo.createUserAndSession(email, password);
     logger.info({ event: "register_success", userId: user.id, ip: req.ip }, "User registered");
-    res.cookie(SESSION_COOKIE_NAME, sessionId, SESSION_COOKIE_OPTIONS);
+    res.cookie(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions());
     res.status(201).json({ user: { id: user.id, email: user.email, created_at: user.created_at } });
   } catch (err) {
     const code =
@@ -70,7 +72,7 @@ export async function login(req: Request, res: Response): Promise<void> {
   }
   const sessionId = await authRepo.loginUser(user.id);
   logger.info({ event: "login_success", userId: user.id, ip: req.ip }, "User logged in");
-  res.cookie(SESSION_COOKIE_NAME, sessionId, SESSION_COOKIE_OPTIONS);
+  res.cookie(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions());
   res.json({ user: { id: user.id, email: user.email, created_at: user.created_at } });
 }
 

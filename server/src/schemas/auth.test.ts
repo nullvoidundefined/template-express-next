@@ -19,6 +19,12 @@ describe("registerSchema", () => {
     expect(result.error!.issues[0]!.message).toBe("Password must be at least 8 characters");
   });
 
+  it("rejects password longer than 72 characters", () => {
+    const result = registerSchema.safeParse({ email: "a@b.com", password: "a".repeat(73) });
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0]!.message).toBe("Password must be at most 72 characters");
+  });
+
   it("rejects missing fields", () => {
     expect(registerSchema.safeParse({}).success).toBe(false);
     expect(registerSchema.safeParse({ email: "a@b.com" }).success).toBe(false);
