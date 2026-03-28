@@ -4,7 +4,7 @@ const envSchema = z.object({
   NODE_ENV: z.string().default("development"),
   PORT: z.coerce.number().default(3000),
   DATABASE_URL: z.string().default(""),
-  DATABASE_SSL_REJECT_UNAUTHORIZED: z.string().optional(),
+  DATABASE_CA_CERT: z.string().optional(),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
   GITHUB_TOKEN: z.string().optional(),
