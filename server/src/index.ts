@@ -16,6 +16,11 @@ import { rateLimiter } from "app/middleware/rateLimiter/rateLimiter.js";
 import { requestLogger } from "app/middleware/requestLogger/requestLogger.js";
 import { loadSession, requireAuth } from "app/middleware/requireAuth/requireAuth.js";
 import {
+  createGitHubPollWorker,
+  githubPollQueue,
+  scheduleGitHubPoll,
+} from "app/queues/githubPoller.js";
+import {
   createHealthCheckWorker,
   healthCheckQueue,
   scheduleServiceCheck,
@@ -23,9 +28,11 @@ import {
 import { deleteExpiredSessions } from "app/repositories/auth/auth.js";
 import { listServices } from "app/repositories/services/services.js";
 import { authRouter } from "app/routes/auth.js";
+import { githubRouter } from "app/routes/github.js";
 import { metricsRouter } from "app/routes/metrics.js";
 import { servicesRouter } from "app/routes/services.js";
 import { statusRouter } from "app/routes/status.js";
+import { webhooksRouter } from "app/routes/webhooks.js";
 import { runCheck } from "app/services/checkRunner.js";
 import { logger } from "app/utils/logs/logger.js";
 
@@ -114,11 +121,15 @@ query("SELECT NOW()")
 // Public status endpoints (no auth) — before loadSession
 app.use("/api/v1/status", statusRouter);
 
+// Webhooks don't need auth — register before loadSession
+app.use("/api/v1/webhooks", webhooksRouter);
+
 // Load session from cookie and set req.user when valid (does not block unauthenticated requests).
 app.use(loadSession);
 
 app.use("/auth", authRouter);
 app.use("/api/v1/services", requireAuth, servicesRouter);
+app.use("/api/v1/services", githubRouter);
 app.use("/api/v1/metrics", requireAuth, metricsRouter);
 
 // Attach reusable utilities for 404 and error handling.
@@ -186,6 +197,34 @@ if (isEntryModule) {
     }
   })();
 
+  // Start GitHub poll worker
+  const githubPollWorker = createGitHubPollWorker();
+  githubPollWorker.on("failed", (job, err) => {
+    logger.error({ jobId: job?.id, err }, "GitHub poll worker job failed");
+  });
+
+  // Schedule GitHub polls for all services with GitHub config on startup
+  void (async () => {
+    try {
+      const services = await listServices();
+      let githubCount = 0;
+      for (const service of services) {
+        if (service.github_owner && service.github_repo) {
+          await scheduleGitHubPoll(
+            service.id,
+            service.github_owner,
+            service.github_repo,
+            service.github_branch,
+          );
+          githubCount++;
+        }
+      }
+      logger.info({ count: githubCount }, "Scheduled GitHub polls for services");
+    } catch (err) {
+      logger.error({ err }, "Failed to schedule GitHub polls on startup");
+    }
+  })();
+
   const server = app.listen(PORT, HOST, () => logger.info({ port: PORT }, "Server running"));
 
   // Periodically clean up expired sessions to prevent table bloat.
@@ -211,6 +250,8 @@ if (isEntryModule) {
     clearInterval(cleanupTimer);
     await healthCheckWorker.close();
     await healthCheckQueue.close();
+    await githubPollWorker.close();
+    await githubPollQueue.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     logger.info("HTTP server closed");
     await pool.end();

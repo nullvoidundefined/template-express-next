@@ -63,6 +63,7 @@ async function StatusContent() {
                                 uptimeHistory={status.uptime_history_90d.filter(
                                     () => true,
                                 )}
+                                ciStatus={service.github?.ci_status ?? null}
                             />
                         ))}
                     </div>

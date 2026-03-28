@@ -1,4 +1,4 @@
-import type { DayUptime, ServiceStatus } from '@/types';
+import type { DayUptime, ServiceStatus, WorkflowStatus } from '@/types';
 
 import UptimeBar from './UptimeBar';
 
@@ -11,6 +11,8 @@ interface ServiceStatusCardProps {
     response_time_avg_30d: number;
     last_checked_at: string | null;
     uptimeHistory: DayUptime[];
+    ciStatus?: WorkflowStatus | null;
+    workflowRunUrl?: string | null;
 }
 
 const statusConfig: Record<
@@ -45,6 +47,28 @@ function formatLastChecked(ts: string | null): string {
     return `${Math.floor(hours / 24)}d ago`;
 }
 
+const ciStatusConfig: Record<
+    WorkflowStatus,
+    { dot: string; label: string; textClass: string }
+> = {
+    success: {
+        dot: 'bg-green-500',
+        label: 'passing',
+        textClass: 'text-green-700',
+    },
+    failure: { dot: 'bg-red-500', label: 'failing', textClass: 'text-red-700' },
+    pending: {
+        dot: 'bg-yellow-400',
+        label: 'running',
+        textClass: 'text-yellow-700',
+    },
+    cancelled: {
+        dot: 'bg-gray-400',
+        label: 'cancelled',
+        textClass: 'text-gray-500',
+    },
+};
+
 export default function ServiceStatusCard({
     name,
     url,
@@ -53,6 +77,8 @@ export default function ServiceStatusCard({
     response_time_avg_30d,
     last_checked_at,
     uptimeHistory,
+    ciStatus,
+    workflowRunUrl,
 }: ServiceStatusCardProps) {
     const { dot, label, text } = statusConfig[status] ?? statusConfig.down;
 
@@ -100,6 +126,34 @@ export default function ServiceStatusCard({
                     </span>
                 </div>
             </div>
+
+            {ciStatus && (
+                <div className="mt-3 flex items-center gap-1.5 text-xs">
+                    <span className="text-gray-500">CI:</span>
+                    {workflowRunUrl ? (
+                        <a
+                            href={workflowRunUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`flex items-center gap-1 font-medium hover:underline ${ciStatusConfig[ciStatus].textClass}`}
+                        >
+                            <span
+                                className={`inline-block h-1.5 w-1.5 rounded-full ${ciStatusConfig[ciStatus].dot}`}
+                            />
+                            {ciStatusConfig[ciStatus].label}
+                        </a>
+                    ) : (
+                        <span
+                            className={`flex items-center gap-1 font-medium ${ciStatusConfig[ciStatus].textClass}`}
+                        >
+                            <span
+                                className={`inline-block h-1.5 w-1.5 rounded-full ${ciStatusConfig[ciStatus].dot}`}
+                            />
+                            {ciStatusConfig[ciStatus].label}
+                        </span>
+                    )}
+                </div>
+            )}
 
             <UptimeBar history={uptimeHistory} />
         </div>
