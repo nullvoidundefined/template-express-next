@@ -1,5 +1,5 @@
 {
-  "name": "web-client",
+  "name": "deployments-health-check-dashboard-web-client",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@9.15.9",
@@ -14,10 +14,15 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "lucide-react": "^1.7.0",
     "next": "15.5.14",
+    "postcss": "^8.5.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "sass": "^1.86.0"
+    "recharts": "^3.8.1",
+    "sass": "^1.86.0",
+    "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -25,6 +30,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/recharts": "^2.0.1",
     "eslint": "^9.39.4",
     "eslint-config-next": "15.5.14",
     "eslint-config-prettier": "^8.6.0",

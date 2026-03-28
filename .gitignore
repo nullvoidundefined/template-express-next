@@ -12,3 +12,9 @@ coverage/
 
 # Logs
 *.log
+
+# Playwright screenshots
+screenshots/
+
+# Server local env
+server/.env

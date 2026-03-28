@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: 'Next template',
+    title: 'Deployments Health Check Dashboard',
     description:
-        'Minimal Next.js App Router starter for standalone apps or pnpm workspaces',
+        'Self-hosted uptime monitoring and status page for deployed projects',
 };
 
 export default function RootLayout({
