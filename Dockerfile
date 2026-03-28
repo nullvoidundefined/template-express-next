@@ -2,6 +2,7 @@
 FROM node:22-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 RUN corepack enable
 
 # System dependencies required by Playwright Chromium
@@ -14,13 +15,13 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
-# --- Dependencies ---
+# --- Dependencies (all deps, for building) ---
 FROM base AS deps
 COPY server/package.json server/package.json
 COPY web-client/package.json web-client/package.json
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --prod=false
-# Install Playwright Chromium browser binary after deps are available
-RUN cd server && npx playwright install chromium --with-deps
+RUN pnpm install --frozen-lockfile
+# Install Playwright Chromium browser binary
+RUN cd server && npx playwright install chromium
 
 # --- Build server ---
 FROM deps AS build-server
@@ -36,9 +37,9 @@ RUN pnpm --filter web-client run build
 FROM base AS server
 COPY server/package.json server/package.json
 COPY web-client/package.json web-client/package.json
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile --prod
-# Install Playwright Chromium in production image
-RUN cd server && npx playwright install chromium --with-deps
+RUN pnpm install --frozen-lockfile --prod
+# Install Playwright Chromium (no --with-deps since system packages already installed in base)
+RUN cd server && npx playwright install chromium
 COPY --from=build-server /app/server/dist server/dist
 COPY server/migrations server/migrations
 EXPOSE 3001
