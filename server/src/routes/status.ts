@@ -3,6 +3,8 @@ import type { Request, Response } from "express";
 
 import { getScreenshotHandler } from "app/handlers/screenshots/screenshots.js";
 import * as checksRepo from "app/repositories/checks/checks.js";
+import * as githubRepo from "app/repositories/github/github.js";
+import * as incidentsRepo from "app/repositories/incidents/incidents.js";
 import * as servicesRepo from "app/repositories/services/services.js";
 import { parseIdParam } from "app/utils/parsers/parseIdParam.js";
 
@@ -11,33 +13,55 @@ const router = Router();
 router.get("/", async (_req: Request, res: Response): Promise<void> => {
   const services = await servicesRepo.listServices();
 
-  const statusItems = await Promise.all(
-    services.map(async (service) => {
-      const latestCheck = await checksRepo.getLatestCheck(service.id);
-      const uptime30d = await checksRepo.getUptimePercent(service.id, 30);
-      return {
-        id: service.id,
-        name: service.name,
-        url: service.url,
-        status: latestCheck?.status ?? "down",
-        uptime_30d: uptime30d,
-        last_checked_at: latestCheck?.checked_at ?? null,
-        response_time_ms: latestCheck?.response_time_ms ?? null,
-      };
-    }),
-  );
+  const [serviceItems, allActiveIncidents, uptimeHistory] = await Promise.all([
+    Promise.all(
+      services.map(async (service) => {
+        const [latestCheck, uptime30d, githubStatus] = await Promise.all([
+          checksRepo.getLatestCheck(service.id),
+          checksRepo.getUptimePercent(service.id, 30),
+          githubRepo.getGithubStatus(service.id),
+        ]);
+        return {
+          ...service,
+          status: (latestCheck?.status ?? "down") as "up" | "degraded" | "down",
+          uptime_percent_30d: uptime30d ?? 0,
+          response_time_avg_30d: latestCheck?.response_time_ms ?? 0,
+          last_checked_at: latestCheck?.checked_at?.toISOString?.() ?? null,
+          github: githubStatus
+            ? {
+                ci_status: githubStatus.workflow_status,
+                last_commit_at: githubStatus.last_commit_at?.toISOString?.() ?? null,
+              }
+            : undefined,
+        };
+      }),
+    ),
+    Promise.all(services.map((s) => incidentsRepo.getActiveIncident(s.id))).then((results) =>
+      results.filter((i): i is NonNullable<typeof i> => i !== null),
+    ),
+    services.length > 0
+      ? checksRepo.getDailyUptime(services[0]!.id, 90)
+      : Promise.resolve([] as checksRepo.DailyUptime[]),
+  ]);
 
-  const overallStatus = statusItems.every((s) => s.status === "up")
-    ? "operational"
-    : statusItems.some((s) => s.status === "down")
-      ? "outage"
-      : "degraded";
+  const overall =
+    serviceItems.length === 0
+      ? "operational"
+      : serviceItems.every((s) => s.status === "up")
+        ? "operational"
+        : serviceItems.some((s) => s.status === "down")
+          ? "outage"
+          : "degraded";
 
   res.json({
     data: {
-      status: overallStatus,
-      services: statusItems,
-      updated_at: new Date().toISOString(),
+      overall,
+      services: serviceItems,
+      active_incidents: allActiveIncidents,
+      uptime_history_90d: uptimeHistory.map((d) => ({
+        date: d.date,
+        uptime_percent: d.uptime_percent,
+      })),
     },
   });
 });
