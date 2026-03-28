@@ -34,5 +34,8 @@ COPY --from=deps /ms-playwright /ms-playwright
 COPY --from=build-server /app/server/dist server/dist
 COPY server/migrations server/migrations
 COPY package.json pnpm-workspace.yaml ./
+COPY server/package.json server/package.json
+# Start script: run migrations then start server
+RUN printf '#!/bin/sh\nset -e\nserver/node_modules/.bin/node-pg-migrate -m server/migrations up\nexec node server/dist/index.js\n' > /app/start.sh && chmod +x /app/start.sh
 EXPOSE 3001
-CMD ["node", "server/dist/index.js"]
+CMD ["/app/start.sh"]
