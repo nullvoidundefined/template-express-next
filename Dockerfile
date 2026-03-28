@@ -1,16 +1,10 @@
 # --- Base ---
-FROM node:22-slim AS base
+# Use the official Playwright Node image which includes all Chromium system dependencies
+FROM mcr.microsoft.com/playwright/node:22-noble AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 RUN corepack enable
-
-# System dependencies required by Playwright Chromium
-RUN apt-get update && apt-get install -y \
-    libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
-    libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-    libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -20,7 +14,8 @@ FROM base AS deps
 COPY server/package.json server/package.json
 COPY web-client/package.json web-client/package.json
 RUN pnpm install --frozen-lockfile
-# Install Playwright Chromium browser binary into /ms-playwright
+# Playwright browsers are pre-installed in /ms-playwright on this image,
+# but install the specific version our package needs
 RUN node_modules/.bin/playwright install chromium
 
 # --- Build server ---
@@ -34,7 +29,6 @@ COPY web-client/ web-client/
 RUN pnpm --filter web-client run build
 
 # --- Production server ---
-# Copy built output + node_modules from deps stage (avoids re-running install)
 FROM base AS server
 COPY --from=deps /app/node_modules node_modules
 COPY --from=deps /ms-playwright /ms-playwright
