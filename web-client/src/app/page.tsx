@@ -22,10 +22,19 @@ async function StatusContent() {
         status.services.map((s) => [s.id, s.name]),
     );
 
+    // Build per-service uptime history map (90d)
+    const uptimeByService = new Map<string, typeof status.uptime_history_90d>(
+        status.services.map((s) => [s.id, []]),
+    );
+    // The API returns global uptime_history_90d — fall back to that for all services
+    for (const svc of status.services) {
+        uptimeByService.set(svc.id, status.uptime_history_90d);
+    }
+
     return (
-        <div className="space-y-8">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-gray-900">
+        <div className="space-y-6 sm:space-y-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
                     System Status
                 </h1>
                 <StatusBadge status={status.overall} />
@@ -60,9 +69,9 @@ async function StatusContent() {
                                     service.response_time_avg_30d
                                 }
                                 last_checked_at={service.last_checked_at}
-                                uptimeHistory={status.uptime_history_90d.filter(
-                                    () => true,
-                                )}
+                                uptimeHistory={
+                                    uptimeByService.get(service.id) ?? []
+                                }
                                 ciStatus={service.github?.ci_status ?? null}
                             />
                         ))}
@@ -79,7 +88,7 @@ async function StatusContent() {
 
 export default function HomePage() {
     return (
-        <div className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mx-auto max-w-4xl px-4 py-6 sm:py-8">
             <StatusPageAutoRefresh />
             <Suspense
                 fallback={

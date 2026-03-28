@@ -18,6 +18,24 @@ services:
     volumes:
       - redis_data:/data
 
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/health_check_dev
+      - REDIS_URL=redis://redis:6379
+      - SESSION_SECRET=change-me-in-production
+      - NODE_ENV=development
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./screenshots:/app/screenshots
+
 volumes:
   postgres_data:
   redis_data:

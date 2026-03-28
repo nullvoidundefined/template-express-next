@@ -24,10 +24,12 @@ import {
   createHealthCheckWorker,
   healthCheckQueue,
   scheduleServiceCheck,
+  connection as redisConnection,
 } from "app/queues/healthCheck.js";
 import {
   createMaintenanceWorker,
   maintenanceQueue,
+  scheduleDataRollup,
   scheduleScreenshotPruning,
 } from "app/queues/maintenance.js";
 import { deleteExpiredSessions } from "app/repositories/auth/auth.js";
@@ -97,27 +99,62 @@ app.use((req, res, next) => {
 });
 
 // Health check — placed before loadSession to avoid unnecessary DB session lookups.
-let healthCacheResult: { status: string; db: string } | null = null;
+let healthCacheResult: {
+  status: string;
+  db: boolean;
+  redis: boolean;
+  queue: { waiting: number; active: number; failed: number };
+} | null = null;
 let healthCacheExpiry = 0;
 const HEALTH_CACHE_TTL_MS = 5_000;
 
 app.get("/health", async (_req, res) => {
   const now = Date.now();
   if (healthCacheResult && now < healthCacheExpiry) {
-    const statusCode = healthCacheResult.db === "connected" ? 200 : 503;
+    const isHealthy = healthCacheResult.db && healthCacheResult.redis;
+    const statusCode = isHealthy ? 200 : 503;
     res.status(statusCode).json(healthCacheResult);
     return;
   }
+
+  const checks = {
+    db: false,
+    redis: false,
+    queue: { waiting: 0, active: 0, failed: 0 },
+  };
+
   try {
     await query("SELECT 1");
-    healthCacheResult = { status: "ok", db: "connected" };
-    healthCacheExpiry = now + HEALTH_CACHE_TTL_MS;
-    res.status(200).json(healthCacheResult);
+    checks.db = true;
   } catch {
-    healthCacheResult = { status: "degraded", db: "disconnected" };
-    healthCacheExpiry = now + HEALTH_CACHE_TTL_MS;
-    res.status(503).json(healthCacheResult);
+    checks.db = false;
   }
+
+  try {
+    await redisConnection.ping();
+    checks.redis = true;
+  } catch {
+    checks.redis = false;
+  }
+
+  try {
+    const counts = await healthCheckQueue.getJobCounts("waiting", "active", "failed");
+    checks.queue = {
+      waiting: counts.waiting ?? 0,
+      active: counts.active ?? 0,
+      failed: counts.failed ?? 0,
+    };
+  } catch {
+    // non-critical
+  }
+
+  const isHealthy = checks.db && checks.redis;
+  healthCacheResult = {
+    status: isHealthy ? "healthy" : "degraded",
+    ...checks,
+  };
+  healthCacheExpiry = now + HEALTH_CACHE_TTL_MS;
+  res.status(isHealthy ? 200 : 503).json(healthCacheResult);
 });
 
 query("SELECT NOW()")
@@ -204,13 +241,16 @@ if (isEntryModule) {
     }
   })();
 
-  // Start maintenance worker (daily screenshot pruning)
+  // Start maintenance worker (screenshot pruning + data rollup)
   const maintenanceWorker = createMaintenanceWorker();
   maintenanceWorker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, err }, "Maintenance worker job failed");
   });
   void scheduleScreenshotPruning().catch((err: unknown) =>
     logger.error({ err }, "Failed to schedule screenshot pruning"),
+  );
+  void scheduleDataRollup().catch((err: unknown) =>
+    logger.error({ err }, "Failed to schedule data rollup"),
   );
 
   // Start GitHub poll worker

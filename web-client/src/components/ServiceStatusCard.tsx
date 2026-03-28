@@ -18,15 +18,26 @@ interface ServiceStatusCardProps {
 
 const statusConfig: Record<
     ServiceStatus,
-    { dot: string; label: string; text: string }
+    { dot: string; label: string; text: string; bg: string }
 > = {
-    up: { dot: 'bg-green-500', label: 'Operational', text: 'text-green-700' },
+    up: {
+        dot: 'bg-green-500',
+        label: 'Operational',
+        text: 'text-green-700',
+        bg: 'bg-green-50',
+    },
     degraded: {
         dot: 'bg-yellow-500',
         label: 'Degraded',
         text: 'text-yellow-700',
+        bg: 'bg-yellow-50',
     },
-    down: { dot: 'bg-red-500', label: 'Down', text: 'text-red-700' },
+    down: {
+        dot: 'bg-red-500',
+        label: 'Down',
+        text: 'text-red-700',
+        bg: 'bg-red-50',
+    },
 };
 
 function formatLastChecked(ts: string | null): string {
@@ -86,21 +97,22 @@ export default function ServiceStatusCard({
 
     return (
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-start justify-between">
-                <div>
+            {/* Header row: stacks vertically on mobile */}
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
                     <a
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-base font-semibold text-gray-900 hover:text-blue-600"
+                        className="block truncate text-base font-semibold text-gray-900 hover:text-blue-600"
                     >
                         {name}
                     </a>
-                    <p className="max-w-xs truncate text-xs text-gray-500">
-                        {url}
-                    </p>
+                    <p className="truncate text-xs text-gray-500">{url}</p>
                 </div>
-                <div className={`flex items-center gap-1.5 ${text}`}>
+                <div
+                    className={`flex shrink-0 items-center gap-1.5 self-start rounded-full px-2.5 py-1 ${statusConfig[status]?.bg ?? 'bg-gray-50'} ${text}`}
+                >
                     <span
                         className={`inline-block h-2 w-2 rounded-full ${dot}`}
                     />
@@ -108,9 +120,10 @@ export default function ServiceStatusCard({
                 </div>
             </div>
 
-            <div className="mb-4 flex gap-6 text-xs text-gray-500">
+            {/* Stats row: wraps gracefully on small screens */}
+            <div className="mb-4 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
                 <div>
-                    <span className="font-medium text-gray-700">
+                    <span className="text-sm font-bold text-gray-900">
                         {uptime_percent_30d.toFixed(2)}%
                     </span>{' '}
                     uptime (30d)
@@ -130,7 +143,7 @@ export default function ServiceStatusCard({
             </div>
 
             {ciStatus && (
-                <div className="mt-3 flex items-center gap-1.5 text-xs">
+                <div className="mb-3 flex items-center gap-1.5 text-xs">
                     <span className="text-gray-500">CI:</span>
                     {workflowRunUrl ? (
                         <a

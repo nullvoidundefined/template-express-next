@@ -91,30 +91,30 @@ export default async function ServiceDetailPage({ params }: Props) {
         statusConfig[currentStatus] ?? statusConfig.down;
 
     return (
-        <div className="mx-auto max-w-4xl space-y-8 px-4 py-8">
+        <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:space-y-8 sm:py-8">
             <div>
                 <div className="mb-1 flex items-center gap-2 text-sm text-gray-500">
                     <Link href="/admin" className="hover:text-blue-600">
                         Admin
                     </Link>
                     <span>/</span>
-                    <span>{service.name}</span>
+                    <span className="truncate">{service.name}</span>
                 </div>
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                    <div className="min-w-0 flex-1">
+                        <h1 className="truncate text-xl font-bold text-gray-900 sm:text-2xl">
                             {service.name}
                         </h1>
                         <a
                             href={service.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline"
+                            className="block truncate text-sm text-blue-600 hover:underline"
                         >
                             {service.url}
                         </a>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex shrink-0 items-center gap-3">
                         <div className={`flex items-center gap-1.5 ${text}`}>
                             <span
                                 className={`inline-block h-2.5 w-2.5 rounded-full ${dot}`}

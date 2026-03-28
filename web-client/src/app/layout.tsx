@@ -29,38 +29,40 @@ export default function RootLayout({
         <html lang="en">
             <body className={`${geistSans.variable} ${geistMono.variable}`}>
                 <header className="border-b border-gray-200 bg-white">
-                    <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-                        <div className="flex items-center gap-6">
-                            <Link
-                                href="/"
-                                className="text-sm font-semibold text-gray-900 hover:text-blue-600"
-                            >
-                                System Status
-                            </Link>
-                            <Link
-                                href="/admin"
-                                className="text-sm font-medium text-gray-600 hover:text-gray-900"
-                            >
-                                Admin
-                            </Link>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <Link
-                                href="/login"
-                                className="text-sm font-medium text-gray-600 hover:text-gray-900"
-                            >
-                                Login
-                            </Link>
-                            <Link
-                                href="/account"
-                                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
-                            >
-                                Account
-                            </Link>
+                    <div className="mx-auto max-w-6xl px-4 py-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4 sm:gap-6">
+                                <Link
+                                    href="/"
+                                    className="text-sm font-semibold text-gray-900 hover:text-blue-600"
+                                >
+                                    System Status
+                                </Link>
+                                <Link
+                                    href="/admin"
+                                    className="text-sm font-medium text-gray-600 hover:text-gray-900"
+                                >
+                                    Admin
+                                </Link>
+                            </div>
+                            <div className="flex items-center gap-2 sm:gap-4">
+                                <Link
+                                    href="/login"
+                                    className="text-sm font-medium text-gray-600 hover:text-gray-900"
+                                >
+                                    Login
+                                </Link>
+                                <Link
+                                    href="/account"
+                                    className="rounded-md bg-blue-600 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                                >
+                                    Account
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 </header>
-                <main>{children}</main>
+                <main className="min-w-0">{children}</main>
             </body>
         </html>
     );

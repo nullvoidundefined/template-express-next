@@ -1,4 +1,5 @@
 import { query } from "app/db/pool/pool.js";
+import { getDailyUptimeFromAggregates } from "app/repositories/aggregates/aggregates.js";
 import type { Check, InsertCheckInput } from "app/schemas/checks.js";
 
 export async function insertCheck(data: InsertCheckInput): Promise<Check> {
@@ -65,6 +66,12 @@ export interface DailyUptime {
 }
 
 export async function getDailyUptime(serviceId: string, days: number): Promise<DailyUptime[]> {
+  // For days > 30, use the check_aggregates table for efficiency
+  if (days > 30) {
+    return getDailyUptimeFromAggregates(serviceId, days);
+  }
+
+  // For days <= 30, query checks directly
   const result = await query<{ date: string; uptime_percent: string | null; total_checks: string }>(
     `SELECT
        DATE(checked_at) AS date,
