@@ -29,6 +29,7 @@ RUN pnpm --filter web-client run build
 # --- Production server (LAST STAGE — used by Railway) ---
 FROM base AS server
 COPY --from=deps /app/node_modules node_modules
+COPY --from=deps /app/server/node_modules server/node_modules
 COPY --from=deps /ms-playwright /ms-playwright
 COPY --from=build-server /app/server/dist server/dist
 COPY server/migrations server/migrations
