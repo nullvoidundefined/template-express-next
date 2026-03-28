@@ -1,9 +1,15 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
-import { getChecks, getIncidents, getService } from '@/lib/services';
+import {
+    getChecks,
+    getGithubStatus,
+    getIncidents,
+    getService,
+} from '@/lib/services';
 
 import CheckDetails from './components/CheckDetails';
+import GitHubSection from './components/GitHubSection';
 import IncidentTimeline from './components/IncidentTimeline';
 import ResponseTimeChart from './components/ResponseTimeChart';
 import ScreenshotViewer from './components/ScreenshotViewer';
@@ -56,15 +62,19 @@ export default async function ServiceDetailPage({ params }: Props) {
         );
     }
 
-    const [checksResult, incidentsResult] = await Promise.allSettled([
-        getChecks(id, { limit: 200 }),
-        getIncidents(id),
-    ]);
+    const [checksResult, incidentsResult, githubResult] =
+        await Promise.allSettled([
+            getChecks(id, { limit: 200 }),
+            getIncidents(id),
+            getGithubStatus(id),
+        ]);
 
     const checks =
         checksResult.status === 'fulfilled' ? checksResult.value.data : [];
     const incidentList =
         incidentsResult.status === 'fulfilled' ? incidentsResult.value : [];
+    const githubStatus =
+        githubResult.status === 'fulfilled' ? githubResult.value : null;
     const latestCheck = checks[0] ?? null;
 
     const statusConfig = {
@@ -148,6 +158,17 @@ export default async function ServiceDetailPage({ params }: Props) {
                     Incidents
                 </h2>
                 <IncidentTimeline incidents={incidentList} serviceId={id} />
+            </div>
+
+            <div>
+                <h2 className="mb-3 text-lg font-semibold text-gray-800">
+                    GitHub
+                </h2>
+                <GitHubSection
+                    github={githubStatus}
+                    githubOwner={service.github_owner}
+                    githubRepo={service.github_repo}
+                />
             </div>
         </div>
     );

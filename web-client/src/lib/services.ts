@@ -106,3 +106,18 @@ export async function createIncident(
     );
     return data.data;
 }
+
+// GitHub Status
+
+export async function getGithubStatus(
+    serviceId: string,
+): Promise<import('@/types').GithubStatus | null> {
+    try {
+        const data = await api<{
+            data: import('@/types').GithubStatus | null;
+        }>(`/api/v1/services/${serviceId}/github`);
+        return data.data;
+    } catch {
+        return null;
+    }
+}

@@ -57,6 +57,7 @@ export interface GithubStatus {
     workflow_name: string | null;
     workflow_status: WorkflowStatus | null;
     workflow_run_url: string | null;
+    build_logs_excerpt?: string | null;
 }
 
 export interface DayUptime {

@@ -8,6 +8,7 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
   GITHUB_TOKEN: z.string().optional(),
+  GITHUB_WEBHOOK_SECRET: z.string().optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_FROM_NUMBER: z.string().optional(),
