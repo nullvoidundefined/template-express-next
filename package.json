@@ -14,7 +14,7 @@
     "format:check": "pnpm -r run format:check",
     "test": "pnpm --filter ./server run test",
     "test:coverage": "pnpm --filter ./server run test:coverage",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install || true"
   },
   "devDependencies": {
     "lefthook": "^2.1.1"

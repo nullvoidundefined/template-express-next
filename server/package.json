@@ -14,7 +14,7 @@
     "lint:fix": "eslint src --ext .ts --fix",
     "migrate:down": "node-pg-migrate down",
     "migrate:up": "node-pg-migrate up",
-    "prepare": "lefthook install",
+    "prepare": "lefthook install || true",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
