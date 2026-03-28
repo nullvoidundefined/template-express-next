@@ -1,8 +1,94 @@
-export default function Home() {
+import { Suspense } from 'react';
+
+import ActiveIncidents from '@/components/ActiveIncidents';
+import ServiceStatusCard from '@/components/ServiceStatusCard';
+import StatusBadge from '@/components/StatusBadge';
+import StatusPageAutoRefresh from '@/components/StatusPageAutoRefresh';
+import { getPublicStatus } from '@/lib/status';
+
+async function StatusContent() {
+    let status;
+    try {
+        status = await getPublicStatus();
+    } catch {
+        return (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+                Unable to load status. Please try again later.
+            </div>
+        );
+    }
+
+    const serviceNames = Object.fromEntries(
+        status.services.map((s) => [s.id, s.name]),
+    );
+
     return (
-        <div>
-            <h1>Home Page</h1>
-            <p>This is a placeholder for the Home page.</p>
+        <div className="space-y-8">
+            <div className="flex items-center justify-between">
+                <h1 className="text-2xl font-bold text-gray-900">
+                    System Status
+                </h1>
+                <StatusBadge status={status.overall} />
+            </div>
+
+            {status.active_incidents.length > 0 && (
+                <ActiveIncidents
+                    incidents={status.active_incidents}
+                    serviceNames={serviceNames}
+                />
+            )}
+
+            <div>
+                <h2 className="mb-4 text-lg font-semibold text-gray-700">
+                    Services
+                </h2>
+                {status.services.length === 0 ? (
+                    <p className="text-sm text-gray-500">
+                        No services configured yet.
+                    </p>
+                ) : (
+                    <div className="space-y-4">
+                        {status.services.map((service) => (
+                            <ServiceStatusCard
+                                key={service.id}
+                                id={service.id}
+                                name={service.name}
+                                url={service.url}
+                                status={service.status}
+                                uptime_percent_30d={service.uptime_percent_30d}
+                                response_time_avg_30d={
+                                    service.response_time_avg_30d
+                                }
+                                last_checked_at={service.last_checked_at}
+                                uptimeHistory={status.uptime_history_90d.filter(
+                                    () => true,
+                                )}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {status.active_incidents.length === 0 && (
+                <ActiveIncidents incidents={[]} />
+            )}
+        </div>
+    );
+}
+
+export default function HomePage() {
+    return (
+        <div className="mx-auto max-w-4xl px-4 py-8">
+            <StatusPageAutoRefresh />
+            <Suspense
+                fallback={
+                    <div className="text-center text-sm text-gray-500">
+                        Loading status...
+                    </div>
+                }
+            >
+                <StatusContent />
+            </Suspense>
         </div>
     );
 }
