@@ -12,7 +12,7 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 FROM base AS deps
 COPY server/package.json server/package.json
 COPY web-client/package.json web-client/package.json
-RUN pnpm install --frozen-lockfile
+RUN LEFTHOOK=0 pnpm install --frozen-lockfile
 # Install Playwright Chromium + all required system dependencies
 RUN node_modules/.bin/playwright install chromium --with-deps
 
