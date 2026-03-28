@@ -14,9 +14,19 @@ import { errorHandler } from "app/middleware/errorHandler/errorHandler.js";
 import { notFoundHandler } from "app/middleware/notFoundHandler/notFoundHandler.js";
 import { rateLimiter } from "app/middleware/rateLimiter/rateLimiter.js";
 import { requestLogger } from "app/middleware/requestLogger/requestLogger.js";
-import { loadSession } from "app/middleware/requireAuth/requireAuth.js";
+import { loadSession, requireAuth } from "app/middleware/requireAuth/requireAuth.js";
+import {
+  createHealthCheckWorker,
+  healthCheckQueue,
+  scheduleServiceCheck,
+} from "app/queues/healthCheck.js";
 import { deleteExpiredSessions } from "app/repositories/auth/auth.js";
+import { listServices } from "app/repositories/services/services.js";
 import { authRouter } from "app/routes/auth.js";
+import { metricsRouter } from "app/routes/metrics.js";
+import { servicesRouter } from "app/routes/services.js";
+import { statusRouter } from "app/routes/status.js";
+import { runCheck } from "app/services/checkRunner.js";
 import { logger } from "app/utils/logs/logger.js";
 
 function validateEnv(): void {
@@ -101,10 +111,15 @@ query("SELECT NOW()")
   .then(() => logger.info("Connected to database"))
   .catch((err: unknown) => logger.error({ err }, "Database connection failed"));
 
+// Public status endpoints (no auth) — before loadSession
+app.use("/api/v1/status", statusRouter);
+
 // Load session from cookie and set req.user when valid (does not block unauthenticated requests).
 app.use(loadSession);
 
 app.use("/auth", authRouter);
+app.use("/api/v1/services", requireAuth, servicesRouter);
+app.use("/api/v1/metrics", requireAuth, metricsRouter);
 
 // Attach reusable utilities for 404 and error handling.
 app.use(notFoundHandler);
@@ -136,6 +151,41 @@ if (isEntryModule) {
     process.exit(1);
   });
 
+  // Start health check worker
+  const healthCheckWorker = createHealthCheckWorker(async (job) => {
+    const { serviceId } = job.data as { serviceId: string };
+    try {
+      const services = await listServices();
+      const service = services.find((s) => s.id === serviceId);
+      if (!service) {
+        logger.warn({ serviceId }, "Health check job: service not found");
+        return;
+      }
+      const result = await runCheck(service);
+      logger.info({ serviceId, status: result.status }, "Health check completed");
+    } catch (err) {
+      logger.error({ err, serviceId }, "Health check job failed");
+      throw err;
+    }
+  });
+
+  healthCheckWorker.on("failed", (job, err) => {
+    logger.error({ jobId: job?.id, err }, "Health check worker job failed");
+  });
+
+  // Schedule health checks for all services on startup
+  void (async () => {
+    try {
+      const services = await listServices();
+      for (const service of services) {
+        await scheduleServiceCheck(service.id, service.check_interval_seconds);
+      }
+      logger.info({ count: services.length }, "Scheduled health checks for all services");
+    } catch (err) {
+      logger.error({ err }, "Failed to schedule health checks on startup");
+    }
+  })();
+
   const server = app.listen(PORT, HOST, () => logger.info({ port: PORT }, "Server running"));
 
   // Periodically clean up expired sessions to prevent table bloat.
@@ -159,6 +209,8 @@ if (isEntryModule) {
     forceExit.unref();
 
     clearInterval(cleanupTimer);
+    await healthCheckWorker.close();
+    await healthCheckQueue.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     logger.info("HTTP server closed");
     await pool.end();
