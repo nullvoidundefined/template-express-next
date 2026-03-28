@@ -1,122 +1,144 @@
 import { FlatCompat } from '@eslint/eslintrc';
+import tsEslintParser from '@typescript-eslint/parser';
+import eslintConfigPrettier from 'eslint-config-prettier';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
+import react from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
+import security from 'eslint-plugin-security';
 import unusedImports from 'eslint-plugin-unused-imports';
+import globals from 'globals';
 import { dirname } from 'path';
+import tseslint from 'typescript-eslint';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const compat = new FlatCompat({
-    baseDirectory: __dirname,
-});
+const compat = new FlatCompat({ baseDirectory: __dirname });
 
-export default [
-    {
-        ignores: [
-            'node_modules/**',
-            '.next/**',
-            'out/**',
-            'build/**',
-            'public/**',
-            'next-env.d.ts',
-        ],
+export default tseslint.config([
+  {
+    ignores: ['node_modules', '.next', 'out', 'build', '**/*.d.ts'],
+  },
+  // Extend next/core-web-vitals; filter react-hooks to avoid plugin conflict below
+  ...compat
+    .extends('next/core-web-vitals', 'next/typescript')
+    .filter((config) => !config.plugins?.['react-hooks']),
+  {
+    linterOptions: {
+      reportUnusedDisableDirectives: true,
     },
-    ...compat.extends(
-        'next/core-web-vitals',
-        'next/typescript',
-        'plugin:import/recommended',
-        'plugin:prettier/recommended',
-        'plugin:react-hooks/recommended',
-        'plugin:react/recommended',
-    ),
-    {
-        plugins: {
-            'unused-imports': unusedImports,
-        },
-        rules: {
-            '@typescript-eslint/ban-ts-comment': [
-                'error',
-                { 'ts-ignore': 'allow-with-description' },
-            ],
-            '@typescript-eslint/naming-convention': [
-                'error',
-                {
-                    selector: 'function',
-                    format: ['camelCase', 'PascalCase'],
-                },
-                {
-                    selector: 'variable',
-                    format: ['camelCase', 'PascalCase', 'UPPER_CASE'],
-                    leadingUnderscore: 'allow',
-                },
-                {
-                    selector: 'typeLike',
-                    format: ['PascalCase'],
-                },
-            ],
-            '@typescript-eslint/no-explicit-any': 'error',
-            '@typescript-eslint/no-unused-vars': 'off',
-            '@typescript-eslint/no-var-requires': 'error',
-            camelcase: 'off',
-            curly: 'error',
-            'function-paren-newline': 'off',
-            'implicit-arrow-linebreak': 'off',
-            'import/no-extraneous-dependencies': [
-                'error',
-                { devDependencies: true },
-            ],
-            'import/no-unresolved': 'off',
-            'import/prefer-default-export': 'off',
-            indent: 'off',
-            'jsx-a11y/anchor-is-valid': [
-                'error',
-                {
-                    aspects: ['invalidHref', 'preferButton'],
-                    components: ['Link'],
-                    specialLink: ['hrefLeft', 'hrefRight'],
-                },
-            ],
-            'jsx-a11y/click-events-have-key-events': 'off',
-            'jsx-a11y/control-has-associated-label': 'off',
-            'jsx-a11y/no-static-element-interactions': 'off',
-            'max-classes-per-file': 'off',
-            'max-len': 'off',
-            'no-console': 'off',
-            'no-underscore-dangle': ['error', { allow: ['__typename'] }],
-            'no-unused-vars': 'off',
-            'no-useless-constructor': 'off',
-            'object-curly-newline': 'off',
-            'operator-linebreak': 'off',
-            'prettier/prettier': 'error',
-            'react-hooks/exhaustive-deps': 'error',
-            'react/destructuring-assignment': ['error', 'always'],
-            'react/display-name': 'error',
-            'react/function-component-definition': 'off',
-            'react/jsx-boolean-value': 'off',
-            'react/jsx-curly-newline': 'off',
-            'react/jsx-filename-extension': 'off',
-            'react/jsx-indent': 'off',
-            'react/jsx-indent-props': 'off',
-            'react/jsx-one-expression-per-line': 'off',
-            'react/jsx-props-no-spreading': 'off',
-            'react/jsx-wrap-multilines': 'off',
-            'react/no-danger': 'off',
-            'react/no-unknown-property': ['error', { ignore: ['jsx'] }],
-            'react/prefer-stateless-function': 'off',
-            'react/prop-types': 'off',
-            'react/react-in-jsx-scope': 'off',
-            'react/require-default-props': 'off',
-            'react/self-closing-comp': 'off',
-            'unused-imports/no-unused-imports': 'warn',
-            'unused-imports/no-unused-vars': [
-                'warn',
-                {
-                    vars: 'all',
-                    varsIgnorePattern: '^_',
-                    args: 'after-used',
-                    argsIgnorePattern: '^_',
-                },
-            ],
-        },
+    extends: [security.configs.recommended],
+    plugins: {
+      security,
+      'unused-imports': unusedImports,
     },
-];
+    rules: {
+      'curly': 'error',
+      'import/no-anonymous-default-export': 'off',
+      'no-console': ['warn', { allow: ['warn', 'info', 'error', 'group'] }],
+      'no-implicit-globals': 'error',
+      'no-param-reassign': ['error', { props: false }],
+      'no-shadow': 'warn',
+      'no-undef': 'error',
+      'no-underscore-dangle': 'off',
+      'no-unreachable': 'warn',
+      'no-unused-expressions': 'error',
+      'no-useless-escape': 'off',
+      'no-var': 'warn',
+      'object-shorthand': ['error', 'always'],
+      'prefer-const': 'warn',
+      'security/detect-eval-with-expression': 'warn',
+      'security/detect-non-literal-fs-filename': 'warn',
+      'security/detect-non-literal-regexp': 'warn',
+      'security/detect-non-literal-require': 'warn',
+      'security/detect-object-injection': 'off',
+      'security/detect-possible-timing-attacks': 'warn',
+      'unused-imports/no-unused-imports': 'warn',
+    },
+  },
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      parser: tsEslintParser,
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+        ecmaVersion: 'latest',
+        project: ['./tsconfig.json'],
+        sourceType: 'module',
+      },
+    },
+    plugins: {
+      'jsx-a11y': jsxA11y,
+      react,
+      'react-hooks': reactHooks,
+    },
+    settings: {
+      react: { version: 'detect' },
+    },
+    rules: {
+      '@typescript-eslint/ban-ts-comment': ['warn', { 'ts-ignore': 'allow-with-description' }],
+      '@typescript-eslint/consistent-type-definitions': 'off',
+      '@typescript-eslint/consistent-type-imports': [
+        'warn',
+        { fixStyle: 'inline-type-imports', prefer: 'type-imports' },
+      ],
+      '@typescript-eslint/no-empty-object-type': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-floating-promises': 'warn',
+      '@typescript-eslint/no-misused-promises': [
+        'warn',
+        { checksVoidReturn: { attributes: false } },
+      ],
+      '@typescript-eslint/no-require-imports': 'warn',
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unused-expressions': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      '@typescript-eslint/require-await': 'off',
+      'no-undef': 'off',
+      'jsx-a11y/anchor-is-valid': 'warn',
+      'jsx-a11y/click-events-have-key-events': 'off',
+      'jsx-a11y/iframe-has-title': 'off',
+      'jsx-a11y/interactive-supports-focus': 'off',
+      'jsx-a11y/no-autofocus': 'warn',
+      'jsx-a11y/no-noninteractive-element-interactions': 'off',
+      'jsx-a11y/no-static-element-interactions': 'off',
+      'no-var': 'warn',
+      'prefer-const': 'warn',
+      'react-hooks/exhaustive-deps': 'warn',
+      'react-hooks/rules-of-hooks': 'warn',
+      'react/display-name': 'warn',
+      'react/jsx-curly-brace-presence': ['error', 'never'],
+      'react/no-unescaped-entities': 'warn',
+      'react/prop-types': 'off',
+      'react/react-in-jsx-scope': 'off',
+      'unused-imports/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  {
+    files: [
+      '**/__tests__/**',
+      '**/__mocks__/**',
+      '**/tests/**',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+    ],
+    languageOptions: {
+      globals: { ...globals.jest },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      'no-console': 'off',
+      'security/detect-non-literal-regexp': 'off',
+    },
+  },
+  eslintConfigPrettier,
+]);
