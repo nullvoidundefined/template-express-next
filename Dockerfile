@@ -19,7 +19,7 @@ RUN node_modules/.pnpm/node_modules/.bin/playwright install chromium --with-deps
 # --- Build server ---
 FROM deps AS build-server
 COPY server/ server/
-RUN pnpm --filter server run build
+RUN pnpm --filter ./server run build
 
 # --- Build web client (for local/CI use) ---
 FROM deps AS build-web
