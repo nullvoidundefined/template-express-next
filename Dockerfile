@@ -15,13 +15,13 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
-# --- Dependencies (all deps, for building) ---
+# --- Dependencies ---
 FROM base AS deps
 COPY server/package.json server/package.json
 COPY web-client/package.json web-client/package.json
 RUN pnpm install --frozen-lockfile
-# Install Playwright Chromium browser binary
-RUN cd server && npx playwright install chromium
+# Install Playwright Chromium browser binary into /ms-playwright
+RUN node_modules/.bin/playwright install chromium
 
 # --- Build server ---
 FROM deps AS build-server
@@ -34,14 +34,13 @@ COPY web-client/ web-client/
 RUN pnpm --filter web-client run build
 
 # --- Production server ---
+# Copy built output + node_modules from deps stage (avoids re-running install)
 FROM base AS server
-COPY server/package.json server/package.json
-COPY web-client/package.json web-client/package.json
-RUN pnpm install --frozen-lockfile --prod
-# Install Playwright Chromium (no --with-deps since system packages already installed in base)
-RUN cd server && npx playwright install chromium
+COPY --from=deps /app/node_modules node_modules
+COPY --from=deps /ms-playwright /ms-playwright
 COPY --from=build-server /app/server/dist server/dist
 COPY server/migrations server/migrations
+COPY package.json pnpm-workspace.yaml ./
 EXPOSE 3001
 CMD ["node", "server/dist/index.js"]
 
