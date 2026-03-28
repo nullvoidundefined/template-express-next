@@ -20,6 +20,11 @@ import {
   healthCheckQueue,
   scheduleServiceCheck,
 } from "app/queues/healthCheck.js";
+import {
+  createMaintenanceWorker,
+  maintenanceQueue,
+  scheduleScreenshotPruning,
+} from "app/queues/maintenance.js";
 import { deleteExpiredSessions } from "app/repositories/auth/auth.js";
 import { listServices } from "app/repositories/services/services.js";
 import { authRouter } from "app/routes/auth.js";
@@ -186,6 +191,15 @@ if (isEntryModule) {
     }
   })();
 
+  // Start maintenance worker (daily screenshot pruning)
+  const maintenanceWorker = createMaintenanceWorker();
+  maintenanceWorker.on("failed", (job, err) => {
+    logger.error({ jobId: job?.id, err }, "Maintenance worker job failed");
+  });
+  void scheduleScreenshotPruning().catch((err: unknown) =>
+    logger.error({ err }, "Failed to schedule screenshot pruning"),
+  );
+
   const server = app.listen(PORT, HOST, () => logger.info({ port: PORT }, "Server running"));
 
   // Periodically clean up expired sessions to prevent table bloat.
@@ -211,6 +225,8 @@ if (isEntryModule) {
     clearInterval(cleanupTimer);
     await healthCheckWorker.close();
     await healthCheckQueue.close();
+    await maintenanceWorker.close();
+    await maintenanceQueue.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     logger.info("HTTP server closed");
     await pool.end();

@@ -4,6 +4,7 @@ import tls from "node:tls";
 import { insertCheck } from "app/repositories/checks/checks.js";
 import type { CheckResult, CheckStatus } from "app/schemas/checks.js";
 import type { Service } from "app/schemas/services.js";
+import { captureScreenshot, pruneScreenshots } from "app/services/screenshotCapture.js";
 import { logger } from "app/utils/logs/logger.js";
 
 const TLS_WARNING_DAYS = 14;
@@ -178,7 +179,15 @@ export async function runCheck(service: Service): Promise<CheckResult> {
     error_message,
   };
 
-  await insertCheck({ service_id: service.id, ...result }).catch((err: unknown) =>
+  let screenshot_path: string | null = null;
+  if (service.screenshot_enabled) {
+    screenshot_path = await captureScreenshot(service.id, service.url);
+    if (screenshot_path) {
+      await pruneScreenshots(service.id);
+    }
+  }
+
+  await insertCheck({ service_id: service.id, ...result, screenshot_path }).catch((err: unknown) =>
     logger.error({ err, serviceId: service.id }, "Failed to persist check"),
   );
 

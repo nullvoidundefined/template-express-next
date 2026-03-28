@@ -1,6 +1,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 
+import { getScreenshotHandler } from "app/handlers/screenshots/screenshots.js";
 import * as checksRepo from "app/repositories/checks/checks.js";
 import * as servicesRepo from "app/repositories/services/services.js";
 import { parseIdParam } from "app/utils/parsers/parseIdParam.js";
@@ -75,5 +76,8 @@ router.get("/:serviceId", async (req: Request, res: Response): Promise<void> => 
     },
   });
 });
+
+// Public screenshot endpoint (no auth — for public status page)
+router.get("/:serviceId/screenshot", getScreenshotHandler);
 
 export { router as statusRouter };

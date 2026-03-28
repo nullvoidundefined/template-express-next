@@ -6,6 +6,7 @@ import { getChecks, getIncidents, getService } from '@/lib/services';
 import CheckDetails from './components/CheckDetails';
 import IncidentTimeline from './components/IncidentTimeline';
 import ResponseTimeChart from './components/ResponseTimeChart';
+import ScreenshotViewer from './components/ScreenshotViewer';
 import TriggerCheckButton from './components/TriggerCheckButton';
 
 async function getSessionUser() {
@@ -132,6 +133,15 @@ export default async function ServiceDetailPage({ params }: Props) {
                 </h2>
                 <ResponseTimeChart data={checks} />
             </div>
+
+            {service.screenshot_enabled && (
+                <div>
+                    <h2 className="mb-3 text-lg font-semibold text-gray-800">
+                        Screenshot
+                    </h2>
+                    <ScreenshotViewer serviceId={id} />
+                </div>
+            )}
 
             <div>
                 <h2 className="mb-3 text-lg font-semibold text-gray-800">

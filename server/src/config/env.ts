@@ -15,6 +15,7 @@ const envSchema = z.object({
   ALERT_EMAIL: z.string().optional(),
   SLACK_WEBHOOK_URL: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  SCREENSHOTS_DIR: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

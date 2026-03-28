@@ -13,8 +13,10 @@ coverage/
 # Logs
 *.log
 
-# Playwright screenshots
-screenshots/
+# Playwright screenshots (storage dir, not source code)
+/screenshots/
+server/screenshots/
+!server/src/**/*screenshots*
 
 # Server local env
 server/.env

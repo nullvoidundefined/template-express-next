@@ -1,5 +1,6 @@
 import type { DayUptime, ServiceStatus } from '@/types';
 
+import PublicScreenshotThumbnail from './PublicScreenshotThumbnail';
 import UptimeBar from './UptimeBar';
 
 interface ServiceStatusCardProps {
@@ -46,6 +47,7 @@ function formatLastChecked(ts: string | null): string {
 }
 
 export default function ServiceStatusCard({
+    id,
     name,
     url,
     status,
@@ -102,6 +104,8 @@ export default function ServiceStatusCard({
             </div>
 
             <UptimeBar history={uptimeHistory} />
+
+            <PublicScreenshotThumbnail serviceId={id} />
         </div>
     );
 }
