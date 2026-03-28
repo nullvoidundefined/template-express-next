@@ -28,13 +28,39 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body className={`${geistSans.variable} ${geistMono.variable}`}>
-                <nav style={{ padding: '1rem', display: 'flex', gap: '1rem' }}>
-                    <Link href="/">Home</Link>
-                    <Link href="/account">Account</Link>
-                    <Link href="/login">Login</Link>
-                    <Link href="/register">Register</Link>
-                </nav>
-                {children}
+                <header className="border-b border-gray-200 bg-white">
+                    <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-6">
+                            <Link
+                                href="/"
+                                className="text-sm font-semibold text-gray-900 hover:text-blue-600"
+                            >
+                                System Status
+                            </Link>
+                            <Link
+                                href="/admin"
+                                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+                            >
+                                Admin
+                            </Link>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <Link
+                                href="/login"
+                                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+                            >
+                                Login
+                            </Link>
+                            <Link
+                                href="/account"
+                                className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                            >
+                                Account
+                            </Link>
+                        </div>
+                    </div>
+                </header>
+                <main>{children}</main>
             </body>
         </html>
     );
