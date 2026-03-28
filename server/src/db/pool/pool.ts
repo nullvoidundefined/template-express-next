@@ -6,9 +6,11 @@ const { Pool } = pg;
 
 export type PoolClient = pg.PoolClient;
 
+// Use CA cert for full SSL verification when provided (e.g. Neon, RDS).
+// Explicitly disable SSL for Railway private networking (no cert available/needed).
 const sslConfig = process.env.DATABASE_CA_CERT
   ? { ssl: { ca: process.env.DATABASE_CA_CERT, rejectUnauthorized: true } }
-  : {};
+  : { ssl: false };
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
