@@ -1,4 +1,4 @@
-import IORedis from "ioredis";
+import { Redis as IORedis } from "ioredis";
 
 import { redisConfig } from "app/config/redis.js";
 import {

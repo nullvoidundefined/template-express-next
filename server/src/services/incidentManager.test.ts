@@ -8,7 +8,7 @@ const { mockIncr, mockDel, mockGet, mockSet } = vi.hoisted(() => ({
 }));
 
 vi.mock("ioredis", () => ({
-  default: vi.fn(() => ({
+  Redis: vi.fn(() => ({
     incr: mockIncr,
     del: mockDel,
     get: mockGet,

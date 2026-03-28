@@ -102,7 +102,7 @@ describe("captureScreenshot", () => {
 
   it("takes a webp screenshot", async () => {
     await captureScreenshot(SERVICE_ID, URL);
-    expect(mockPage.screenshot).toHaveBeenCalledWith(expect.objectContaining({ type: "webp" }));
+    expect(mockPage.screenshot).toHaveBeenCalledWith(expect.objectContaining({ type: "jpeg" }));
   });
 
   it("closes the browser even on error", async () => {

@@ -4,7 +4,7 @@ import { logger } from "app/utils/logs/logger.js";
 const GITHUB_API = "https://api.github.com";
 
 interface GitHubHeaders {
-  Authorization?: string;
+  [key: string]: string;
   Accept: string;
   "User-Agent": string;
   "X-GitHub-Api-Version": string;

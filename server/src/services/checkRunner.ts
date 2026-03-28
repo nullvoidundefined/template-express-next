@@ -1,7 +1,7 @@
 import dns from "node:dns";
 import tls from "node:tls";
 
-import IORedis from "ioredis";
+import { Redis as IORedis } from "ioredis";
 
 import { redisConfig } from "app/config/redis.js";
 import { insertCheck } from "app/repositories/checks/checks.js";

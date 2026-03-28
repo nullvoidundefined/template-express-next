@@ -22,7 +22,7 @@ export async function captureScreenshot(serviceId: string, url: string): Promise
 
     const filename = `${Date.now()}.webp`;
     const filepath = path.join(SCREENSHOTS_DIR, serviceId, filename);
-    await page.screenshot({ path: filepath, type: "webp" });
+    await page.screenshot({ path: filepath, type: "jpeg" });
 
     return filepath;
   } catch (err) {
@@ -53,7 +53,8 @@ export function getLatestScreenshotPath(serviceId: string): Promise<string | nul
     .readdir(dir)
     .then((files) => {
       const webps = files.filter((f) => f.endsWith(".webp")).sort();
-      return webps.length > 0 ? path.join(dir, webps[webps.length - 1]) : null;
+      const last = webps[webps.length - 1];
+      return last !== undefined ? path.join(dir, last) : null;
     })
     .catch(() => null);
 }
