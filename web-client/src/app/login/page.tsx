@@ -28,57 +28,58 @@ export default function LoginPage() {
     }
 
     return (
-        <div style={{ maxWidth: 400, margin: '4rem auto', padding: '0 1rem' }}>
-            <h1>Log in</h1>
-            <form onSubmit={handleSubmit} style={{ marginTop: '1.5rem' }}>
-                <div style={{ marginBottom: '1rem' }}>
-                    <label htmlFor="email">Email</label>
+        <div className="mx-auto max-w-sm px-4 py-16">
+            <h1 className="mb-6 text-2xl font-bold text-gray-900">Log in</h1>
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label
+                        htmlFor="email"
+                        className="mb-1 block text-sm font-medium text-gray-700"
+                    >
+                        Email
+                    </label>
                     <input
                         id="email"
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        style={{
-                            display: 'block',
-                            width: '100%',
-                            padding: '0.5rem',
-                            marginTop: '0.25rem',
-                        }}
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                 </div>
-                <div style={{ marginBottom: '1rem' }}>
-                    <label htmlFor="password">Password</label>
+                <div>
+                    <label
+                        htmlFor="password"
+                        className="mb-1 block text-sm font-medium text-gray-700"
+                    >
+                        Password
+                    </label>
                     <input
                         id="password"
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        style={{
-                            display: 'block',
-                            width: '100%',
-                            padding: '0.5rem',
-                            marginTop: '0.25rem',
-                        }}
+                        className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                 </div>
-                {error && (
-                    <p style={{ color: 'red', marginBottom: '1rem' }}>
-                        {error}
-                    </p>
-                )}
+                {error && <p className="text-sm text-red-600">{error}</p>}
                 <button
                     type="submit"
                     disabled={loading}
-                    style={{ padding: '0.5rem 1.5rem' }}
+                    className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                 >
                     {loading ? 'Logging in...' : 'Log in'}
                 </button>
             </form>
-            <p style={{ marginTop: '1rem' }}>
+            <p className="mt-4 text-sm text-gray-600">
                 Don&apos;t have an account?{' '}
-                <Link href="/register">Register</Link>
+                <Link
+                    href="/register"
+                    className="text-blue-600 hover:underline"
+                >
+                    Register
+                </Link>
             </p>
         </div>
     );

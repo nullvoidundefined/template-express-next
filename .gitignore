@@ -20,3 +20,4 @@ server/screenshots/
 
 # Server local env
 server/.env
+.vercel
