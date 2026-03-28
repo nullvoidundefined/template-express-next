@@ -18,7 +18,7 @@ export const up = (pgm) => {
     timeout_ms: { type: "int", notNull: true, default: 10000 },
     expected_status_code: { type: "int", notNull: true, default: 200 },
     screenshot_enabled: { type: "bool", notNull: true, default: true },
-    tags: { type: "text[]", notNull: true, default: "'{}'" },
+    tags: { type: "text[]", notNull: true, default: pgm.func("'{}'") },
     created_at: { type: "timestamptz", default: pgm.func("NOW()") },
     updated_at: { type: "timestamptz", default: pgm.func("NOW()") },
   });
