@@ -1,13 +1,21 @@
 import dns from "node:dns";
 import tls from "node:tls";
 
+import IORedis from "ioredis";
+
+import { redisConfig } from "app/config/redis.js";
 import { insertCheck } from "app/repositories/checks/checks.js";
 import type { CheckResult, CheckStatus } from "app/schemas/checks.js";
 import type { Service } from "app/schemas/services.js";
+import { handleIncidentLogic } from "app/services/incidentManager.js";
+import { dispatch } from "app/services/notifications/dispatcher.js";
 import { captureScreenshot, pruneScreenshots } from "app/services/screenshotCapture.js";
 import { logger } from "app/utils/logs/logger.js";
 
 const TLS_WARNING_DAYS = 14;
+const TLS_URGENT_DAYS = 7;
+
+const redis = new IORedis(redisConfig.url, { maxRetriesPerRequest: null });
 
 function parseTlsExpiresAt(certInfo: tls.PeerCertificate): Date | null {
   try {
@@ -68,6 +76,43 @@ function determineStatus(opts: {
   return "up";
 }
 
+async function maybeSendTlsWarning(service: Service, tlsExpiresAt: Date | null): Promise<void> {
+  if (!tlsExpiresAt) return;
+
+  const daysUntilExpiry = (tlsExpiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+
+  if (daysUntilExpiry > TLS_WARNING_DAYS) return;
+
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const warnKey = `tls_warned:${service.id}:${today}`;
+  const alreadyWarned = await redis.get(warnKey);
+  if (alreadyWarned) return;
+
+  const days = Math.ceil(daysUntilExpiry);
+  const event = {
+    type: "tls_warning" as const,
+    serviceId: service.id,
+    serviceName: service.name,
+    daysUntilExpiry: days,
+  };
+
+  if (daysUntilExpiry <= TLS_URGENT_DAYS) {
+    // Within 7 days: dispatch to all channels (SMS + email + slack)
+    await dispatch(event).catch((err) =>
+      logger.error({ err, serviceId: service.id }, "Failed to dispatch urgent TLS warning"),
+    );
+  } else {
+    // Within 14 days but > 7 days: email only
+    const { sendEmail } = await import("app/services/notifications/resend.js");
+    await sendEmail(event).catch((err) =>
+      logger.error({ err, serviceId: service.id }, "Failed to send TLS warning email"),
+    );
+  }
+
+  // Deduplicate: one warning per service per day (expire after 25 hours)
+  await redis.set(warnKey, "1", "EX", 90000);
+}
+
 export async function runCheck(service: Service): Promise<CheckResult> {
   const targetUrl = service.health_endpoint ?? service.url;
   let hostname: string;
@@ -92,6 +137,9 @@ export async function runCheck(service: Service): Promise<CheckResult> {
     await insertCheck({ service_id: service.id, ...result }).catch((err: unknown) =>
       logger.error({ err, serviceId: service.id }, "Failed to persist check"),
     );
+    await handleIncidentLogic(service, result).catch((err: unknown) =>
+      logger.error({ err, serviceId: service.id }, "Failed to handle incident logic"),
+    );
     return result;
   }
 
@@ -113,6 +161,9 @@ export async function runCheck(service: Service): Promise<CheckResult> {
     };
     await insertCheck({ service_id: service.id, ...result }).catch((insertErr: unknown) =>
       logger.error({ err: insertErr, serviceId: service.id }, "Failed to persist check"),
+    );
+    await handleIncidentLogic(service, result).catch((incidentErr: unknown) =>
+      logger.error({ err: incidentErr, serviceId: service.id }, "Failed to handle incident logic"),
     );
     return result;
   }
@@ -190,6 +241,17 @@ export async function runCheck(service: Service): Promise<CheckResult> {
   await insertCheck({ service_id: service.id, ...result, screenshot_path }).catch((err: unknown) =>
     logger.error({ err, serviceId: service.id }, "Failed to persist check"),
   );
+
+  await handleIncidentLogic(service, result).catch((err: unknown) =>
+    logger.error({ err, serviceId: service.id }, "Failed to handle incident logic"),
+  );
+
+  // TLS expiration warnings
+  if (isHttps && tls_expires_at) {
+    await maybeSendTlsWarning(service, tls_expires_at).catch((err: unknown) =>
+      logger.error({ err, serviceId: service.id }, "Failed to send TLS warning"),
+    );
+  }
 
   return result;
 }

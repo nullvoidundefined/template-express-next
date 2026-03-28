@@ -121,3 +121,17 @@ export async function getGithubStatus(
         return null;
     }
 }
+
+export async function updateIncident(
+    incidentId: string,
+    data: { status?: string; cause?: string },
+): Promise<Incident> {
+    const result = await api<{ data: Incident }>(
+        `/api/v1/incidents/${incidentId}`,
+        {
+            method: 'PUT',
+            body: data as unknown as Record<string, unknown>,
+        },
+    );
+    return result.data;
+}

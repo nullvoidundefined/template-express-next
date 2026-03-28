@@ -34,6 +34,7 @@ import { deleteExpiredSessions } from "app/repositories/auth/auth.js";
 import { listServices } from "app/repositories/services/services.js";
 import { authRouter } from "app/routes/auth.js";
 import { githubRouter } from "app/routes/github.js";
+import { incidentsRouter } from "app/routes/incidents.js";
 import { metricsRouter } from "app/routes/metrics.js";
 import { servicesRouter } from "app/routes/services.js";
 import { statusRouter } from "app/routes/status.js";
@@ -136,6 +137,7 @@ app.use("/auth", authRouter);
 app.use("/api/v1/services", requireAuth, servicesRouter);
 app.use("/api/v1/services", githubRouter);
 app.use("/api/v1/metrics", requireAuth, metricsRouter);
+app.use("/api/v1/incidents", incidentsRouter);
 
 // Attach reusable utilities for 404 and error handling.
 app.use(notFoundHandler);

@@ -14,6 +14,14 @@ export async function getIncidentById(id: string): Promise<Incident | null> {
   return result.rows[0] ?? null;
 }
 
+export async function getActiveIncident(serviceId: string): Promise<Incident | null> {
+  const result = await query<Incident>(
+    `SELECT * FROM incidents WHERE service_id = $1 AND resolved_at IS NULL ORDER BY created_at DESC LIMIT 1`,
+    [serviceId],
+  );
+  return result.rows[0] ?? null;
+}
+
 export async function createIncident(
   serviceId: string,
   data: CreateIncidentInput,
@@ -27,6 +35,14 @@ export async function createIncident(
   const row = result.rows[0];
   if (!row) throw new Error("Insert returned no row");
   return row;
+}
+
+export async function resolveIncident(id: string): Promise<Incident | null> {
+  const result = await query<Incident>(
+    `UPDATE incidents SET status = 'resolved', resolved_at = now() WHERE id = $1 RETURNING *`,
+    [id],
+  );
+  return result.rows[0] ?? null;
 }
 
 export async function updateIncident(
