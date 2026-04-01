@@ -11,7 +11,7 @@ function sessionCookieOptions() {
     httpOnly: true,
     maxAge: SESSION_TTL_MS,
     path: "/",
-    sameSite: "lax" as const,
+    sameSite: isProduction() ? ("none" as const) : ("lax" as const),
     secure: isProduction(),
   };
 }

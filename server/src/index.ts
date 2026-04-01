@@ -14,9 +14,34 @@ import { errorHandler } from "app/middleware/errorHandler/errorHandler.js";
 import { notFoundHandler } from "app/middleware/notFoundHandler/notFoundHandler.js";
 import { rateLimiter } from "app/middleware/rateLimiter/rateLimiter.js";
 import { requestLogger } from "app/middleware/requestLogger/requestLogger.js";
-import { loadSession } from "app/middleware/requireAuth/requireAuth.js";
+import { loadSession, requireAuth } from "app/middleware/requireAuth/requireAuth.js";
+import {
+  createGitHubPollWorker,
+  githubPollQueue,
+  scheduleGitHubPoll,
+} from "app/queues/githubPoller.js";
+import {
+  createHealthCheckWorker,
+  healthCheckQueue,
+  scheduleServiceCheck,
+  connection as redisConnection,
+} from "app/queues/healthCheck.js";
+import {
+  createMaintenanceWorker,
+  maintenanceQueue,
+  scheduleDataRollup,
+  scheduleScreenshotPruning,
+} from "app/queues/maintenance.js";
 import { deleteExpiredSessions } from "app/repositories/auth/auth.js";
+import { listServices } from "app/repositories/services/services.js";
 import { authRouter } from "app/routes/auth.js";
+import { githubRouter } from "app/routes/github.js";
+import { incidentsRouter } from "app/routes/incidents.js";
+import { metricsRouter } from "app/routes/metrics.js";
+import { servicesRouter } from "app/routes/services.js";
+import { statusRouter } from "app/routes/status.js";
+import { webhooksRouter } from "app/routes/webhooks.js";
+import { runCheck } from "app/services/checkRunner.js";
 import { logger } from "app/utils/logs/logger.js";
 
 function validateEnv(): void {
@@ -74,37 +99,82 @@ app.use((req, res, next) => {
 });
 
 // Health check — placed before loadSession to avoid unnecessary DB session lookups.
-let healthCacheResult: { status: string; db: string } | null = null;
+let healthCacheResult: {
+  status: string;
+  db: boolean;
+  redis: boolean;
+  queue: { waiting: number; active: number; failed: number };
+} | null = null;
 let healthCacheExpiry = 0;
 const HEALTH_CACHE_TTL_MS = 5_000;
 
 app.get("/health", async (_req, res) => {
   const now = Date.now();
   if (healthCacheResult && now < healthCacheExpiry) {
-    const statusCode = healthCacheResult.db === "connected" ? 200 : 503;
+    const isHealthy = healthCacheResult.db && healthCacheResult.redis;
+    const statusCode = isHealthy ? 200 : 503;
     res.status(statusCode).json(healthCacheResult);
     return;
   }
+
+  const checks = {
+    db: false,
+    redis: false,
+    queue: { waiting: 0, active: 0, failed: 0 },
+  };
+
   try {
     await query("SELECT 1");
-    healthCacheResult = { status: "ok", db: "connected" };
-    healthCacheExpiry = now + HEALTH_CACHE_TTL_MS;
-    res.status(200).json(healthCacheResult);
+    checks.db = true;
   } catch {
-    healthCacheResult = { status: "degraded", db: "disconnected" };
-    healthCacheExpiry = now + HEALTH_CACHE_TTL_MS;
-    res.status(503).json(healthCacheResult);
+    checks.db = false;
   }
+
+  try {
+    await redisConnection.ping();
+    checks.redis = true;
+  } catch {
+    checks.redis = false;
+  }
+
+  try {
+    const counts = await healthCheckQueue.getJobCounts("waiting", "active", "failed");
+    checks.queue = {
+      waiting: counts.waiting ?? 0,
+      active: counts.active ?? 0,
+      failed: counts.failed ?? 0,
+    };
+  } catch {
+    // non-critical
+  }
+
+  const isHealthy = checks.db && checks.redis;
+  healthCacheResult = {
+    status: isHealthy ? "healthy" : "degraded",
+    ...checks,
+  };
+  healthCacheExpiry = now + HEALTH_CACHE_TTL_MS;
+  res.status(isHealthy ? 200 : 503).json(healthCacheResult);
 });
 
 query("SELECT NOW()")
   .then(() => logger.info("Connected to database"))
   .catch((err: unknown) => logger.error({ err }, "Database connection failed"));
 
+// Public status endpoints (no auth) — before loadSession
+app.use("/api/v1/status", statusRouter);
+
+// Webhooks don't need auth — register before loadSession
+app.use("/api/v1/webhooks", webhooksRouter);
+
 // Load session from cookie and set req.user when valid (does not block unauthenticated requests).
 app.use(loadSession);
 
 app.use("/auth", authRouter);
+app.use("/api/v1/services", requireAuth, servicesRouter);
+app.use("/api/v1/services", githubRouter);
+app.use("/api/v1/metrics", requireAuth, metricsRouter);
+app.use("/api/v1/incidents", incidentsRouter);
 
 // Attach reusable utilities for 404 and error handling.
 app.use(notFoundHandler);
@@ -136,6 +206,81 @@ if (isEntryModule) {
     process.exit(1);
   });
 
+  // Start health check worker
+  const healthCheckWorker = createHealthCheckWorker(async (job) => {
+    const { serviceId } = job.data as { serviceId: string };
+    try {
+      const services = await listServices();
+      const service = services.find((s) => s.id === serviceId);
+      if (!service) {
+        logger.warn({ serviceId }, "Health check job: service not found");
+        return;
+      }
+      const result = await runCheck(service);
+      logger.info({ serviceId, status: result.status }, "Health check completed");
+    } catch (err) {
+      logger.error({ err, serviceId }, "Health check job failed");
+      throw err;
+    }
+  });
+
+  healthCheckWorker.on("failed", (job, err) => {
+    logger.error({ jobId: job?.id, err }, "Health check worker job failed");
+  });
+
+  // Schedule health checks for all services on startup
+  void (async () => {
+    try {
+      const services = await listServices();
+      for (const service of services) {
+        await scheduleServiceCheck(service.id, service.check_interval_seconds);
+      }
+      logger.info({ count: services.length }, "Scheduled health checks for all services");
+    } catch (err) {
+      logger.error({ err }, "Failed to schedule health checks on startup");
+    }
+  })();
+
+  // Start maintenance worker (screenshot pruning + data rollup)
+  const maintenanceWorker = createMaintenanceWorker();
+  maintenanceWorker.on("failed", (job, err) => {
+    logger.error({ jobId: job?.id, err }, "Maintenance worker job failed");
+  });
+  void scheduleScreenshotPruning().catch((err: unknown) =>
+    logger.error({ err }, "Failed to schedule screenshot pruning"),
+  );
+  void scheduleDataRollup().catch((err: unknown) =>
+    logger.error({ err }, "Failed to schedule data rollup"),
+  );
+
+  // Start GitHub poll worker
+  const githubPollWorker = createGitHubPollWorker();
+  githubPollWorker.on("failed", (job, err) => {
+    logger.error({ jobId: job?.id, err }, "GitHub poll worker job failed");
+  });
+
+  // Schedule GitHub polls for all services with GitHub config on startup
+  void (async () => {
+    try {
+      const services = await listServices();
+      let githubCount = 0;
+      for (const service of services) {
+        if (service.github_owner && service.github_repo) {
+          await scheduleGitHubPoll(
+            service.id,
+            service.github_owner,
+            service.github_repo,
+            service.github_branch,
+          );
+          githubCount++;
+        }
+      }
+      logger.info({ count: githubCount }, "Scheduled GitHub polls for services");
+    } catch (err) {
+      logger.error({ err }, "Failed to schedule GitHub polls on startup");
+    }
+  })();
+
   const server = app.listen(PORT, HOST, () => logger.info({ port: PORT }, "Server running"));
 
   // Periodically clean up expired sessions to prevent table bloat.
@@ -159,6 +304,12 @@ if (isEntryModule) {
     forceExit.unref();
 
     clearInterval(cleanupTimer);
+    await healthCheckWorker.close();
+    await healthCheckQueue.close();
+    await maintenanceWorker.close();
+    await maintenanceQueue.close();
+    await githubPollWorker.close();
+    await githubPollQueue.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));
     logger.info("HTTP server closed");
     await pool.end();
