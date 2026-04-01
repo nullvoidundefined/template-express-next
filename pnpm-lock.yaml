@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@bottomlessmargaritas/claude-architecture-prompts':
+        specifier: 3.0.0
+        version: 3.0.0
     devDependencies:
       lefthook:
         specifier: ^2.1.1
@@ -274,6 +278,11 @@ packages:
   '@bcoe/v8-coverage@1.0.2':
     resolution: {integrity: sha512-6zABk/ECA/QYSCQ1NGiVwwbQerUCZ+TQbp64Q3AgmfNvurHH0j8TtXa1qbShXA6qqkpAj4V5W8pP6mLe1mcMqA==}
     engines: {node: '>=18'}
+
+  '@bottomlessmargaritas/claude-architecture-prompts@3.0.0':
+    resolution: {integrity: sha512-nm6uIXVhW4A+ulw9vVnV+Gzj9a163sqVHBtkGT4PTbJY7g5ECW9oXwDUj7maW2sFTvWE2ntZl0G/noy0bxKVHw==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   '@emnapi/core@1.9.1':
     resolution: {integrity: sha512-mukuNALVsoix/w1BJwFzwXBN/dHeejQtuVzcDsfOEsdpCumXb/E9j8w11h5S54tT1xhifGfbbSm/ICrObRb3KA==}
@@ -3820,6 +3829,8 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
 
   '@bcoe/v8-coverage@1.0.2': {}
+
+  '@bottomlessmargaritas/claude-architecture-prompts@3.0.0': {}
 
   '@emnapi/core@1.9.1':
     dependencies:
