@@ -1,6 +1,6 @@
 import { corsConfig } from 'app/config/corsConfig.js';
 import { isProduction } from 'app/config/env.js';
-import pool, { query } from 'app/db/pool/pool.js';
+import { pool, query } from 'app/db/pool/pool.js';
 import { csrfGuard } from 'app/middleware/csrfGuard/csrfGuard.js';
 import { errorHandler } from 'app/middleware/errorHandler/errorHandler.js';
 import { notFoundHandler } from 'app/middleware/notFoundHandler/notFoundHandler.js';

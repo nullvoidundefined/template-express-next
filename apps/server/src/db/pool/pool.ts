@@ -60,4 +60,4 @@ export async function withTransaction<T>(
   }
 }
 
-export default pool;
+export { pool };
