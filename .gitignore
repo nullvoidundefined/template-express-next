@@ -13,10 +13,11 @@ coverage/
 # Logs
 *.log
 
-# Playwright screenshots (storage dir, not source code)
-/screenshots/
-server/screenshots/
-!server/src/**/*screenshots*
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
 
 # Server local env
 server/.env
