@@ -1,5 +1,6 @@
 import { api } from '@/services/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 describe('api', () => {
   beforeEach(() => {
@@ -15,7 +16,7 @@ describe('api', () => {
       new Response(JSON.stringify({ data: 'ok' }), { status: 200 }),
     );
 
-    await api('/test');
+    await api('/test', z.object({ data: z.string() }));
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/test'),
@@ -34,7 +35,10 @@ describe('api', () => {
       new Response(JSON.stringify({ data: 'created' }), { status: 201 }),
     );
 
-    await api('/items', { body: { title: 'hello' }, method: 'POST' });
+    await api('/items', z.object({ data: z.string() }), {
+      body: { title: 'hello' },
+      method: 'POST',
+    });
 
     expect(fetch).toHaveBeenCalledWith(
       expect.any(String),
@@ -53,6 +57,28 @@ describe('api', () => {
     expect(result).toBeUndefined();
   });
 
+  it('parses and returns response through Zod schema', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ id: '123', name: 'test' }), {
+        status: 200,
+      }),
+    );
+
+    const schema = z.object({ id: z.string(), name: z.string() });
+    const result = await api('/items/1', schema);
+
+    expect(result).toEqual({ id: '123', name: 'test' });
+  });
+
+  it('throws when response does not match schema', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ wrong: 'shape' }), { status: 200 }),
+    );
+
+    const schema = z.object({ id: z.string().uuid() });
+    await expect(api('/items/1', schema)).rejects.toThrow();
+  });
+
   it('throws with server error message on non-ok response', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(
@@ -62,7 +88,7 @@ describe('api', () => {
     );
 
     await expect(
-      api('/auth/register', {
+      api('/auth/register', z.unknown(), {
         body: { email: 'a@b.com', password: 'pw' },
         method: 'POST',
       }),
@@ -74,6 +100,6 @@ describe('api', () => {
       new Response(JSON.stringify({}), { status: 500 }),
     );
 
-    await expect(api('/broken')).rejects.toThrow('Request failed');
+    await expect(api('/broken', z.unknown())).rejects.toThrow('Request failed');
   });
 });

@@ -3,10 +3,20 @@
 import { api } from '@/services/api';
 import type { User } from '@repo/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 
 export type { User };
 
-type AuthResponse = { user: User };
+// Runtime schema mirrors the User type from @repo/types.
+// Keeps the TypeScript type (compile-time) and Zod schema (runtime) in sync.
+const userSchema = z.object({
+  createdAt: z.string(),
+  email: z.string(),
+  id: z.string(),
+  updatedAt: z.string().nullable(),
+});
+
+const authResponseSchema = z.object({ user: userSchema });
 
 type Credentials = { email: string; password: string };
 
@@ -17,7 +27,7 @@ function useAuth() {
 
   const { data: user = null, isLoading } = useQuery({
     queryFn: async () => {
-      const data = await api<AuthResponse>('/auth/me');
+      const data = await api('/auth/me', authResponseSchema);
       return data.user;
     },
     queryKey: AUTH_KEY,
@@ -25,7 +35,7 @@ function useAuth() {
 
   const loginMutation = useMutation({
     mutationFn: ({ email, password }: Credentials) =>
-      api<AuthResponse>('/auth/login', {
+      api('/auth/login', authResponseSchema, {
         body: { email, password },
         method: 'POST',
       }).then((d) => d.user),
@@ -39,7 +49,7 @@ function useAuth() {
 
   const registerMutation = useMutation({
     mutationFn: ({ email, password }: Credentials) =>
-      api<AuthResponse>('/auth/register', {
+      api('/auth/register', authResponseSchema, {
         body: { email, password },
         method: 'POST',
       }).then((d) => d.user),

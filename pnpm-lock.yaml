@@ -39,6 +39,9 @@ importers:
       sass:
         specifier: ^1.86.0
         version: 1.98.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@eslint/eslintrc':
         specifier: ^3
