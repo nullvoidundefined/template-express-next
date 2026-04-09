@@ -503,7 +503,7 @@ GET    /items/:id/details  # nested resource
 
 - Vitest as the test runner (configured in `vitest.config.ts`).
 - Supertest for HTTP integration tests (Express routes).
-- Coverage target: 60% minimum (branches, functions, lines, statements).
+- Coverage target: 80% minimum (branches, functions, lines, statements). Matches the threshold in `vitest.config.ts`.
 - Test files live in `src/__tests__/`, mirroring the source tree. See the root `CLAUDE.md` Testing Conventions section.
 
 Handler tests mock the repository layer and test HTTP behavior:
