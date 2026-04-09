@@ -19,6 +19,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@repo/types": "workspace:*",
     "@tanstack/react-query": "^5.96.2",
     "next": "15.5.14",
     "react": "^19.0.0",

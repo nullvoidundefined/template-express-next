@@ -1,15 +1,10 @@
 'use client';
 
 import { api } from '@/services/api';
+import type { User } from '@repo/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-// TODO: move to @repo/types
-export type User = {
-  createdAt: string;
-  email: string;
-  id: string;
-  updatedAt: string | null;
-};
+export type { User };
 
 type AuthResponse = { user: User };
 
