@@ -1,8 +1,8 @@
+import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { githubWebhookHandler } from 'app/handlers/webhooks/github.js';
 import { errorHandler } from 'app/middleware/errorHandler/errorHandler.js';
 import * as githubRepo from 'app/repositories/github/github.js';
 import * as servicesRepo from 'app/repositories/services/services.js';
-import { uuid } from 'app/utils/tests/uuids.js';
 import crypto from 'crypto';
 import express from 'express';
 import request from 'supertest';

@@ -1,7 +1,7 @@
+import { mockResult } from 'app/__tests__/helpers/mockResult.js';
+import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { query } from 'app/db/pool/pool.js';
 import * as servicesRepo from 'app/repositories/services/services.js';
-import { mockResult } from 'app/utils/tests/mockResult.js';
-import { uuid } from 'app/utils/tests/uuids.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('app/db/pool/pool.js', () => ({

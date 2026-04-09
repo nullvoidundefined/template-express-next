@@ -17,7 +17,7 @@ export default defineConfig({
         '**/db/**',
         '**/rateLimiter.ts',
         '**/*.d.ts',
-        '**/*.test.ts',
+        'src/__tests__/**',
         'src/index.ts',
         'src/constants/**',
       ],
@@ -33,6 +33,7 @@ export default defineConfig({
     },
     environment: 'node',
     exclude: [...configDefaults.exclude, 'migrations/**'],
+    include: ['src/__tests__/**/*.test.ts'],
     globals: true,
   },
 });

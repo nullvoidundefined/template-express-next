@@ -1,7 +1,7 @@
+import { uuid } from 'app/__tests__/helpers/uuids.js';
 import * as servicesHandlers from 'app/handlers/services/services.js';
 import { errorHandler } from 'app/middleware/errorHandler/errorHandler.js';
 import * as servicesRepo from 'app/repositories/services/services.js';
-import { uuid } from 'app/utils/tests/uuids.js';
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
