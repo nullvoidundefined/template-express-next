@@ -117,6 +117,27 @@ export async function loginUser(userId: string): Promise<string> {
 }
 
 /**
+ * Verifies credentials and returns the user without exposing password_hash.
+ * Returns null when email does not exist or password is wrong; callers cannot
+ * distinguish which case failed (intentional: prevents user enumeration).
+ */
+export async function authenticate(
+  email: string,
+  password: string,
+): Promise<User | null> {
+  const row = await findUserByEmail(email);
+  if (!row) return null;
+  const valid = await verifyPassword(password, row.password_hash);
+  if (!valid) return null;
+  return {
+    created_at: row.created_at,
+    email: row.email,
+    id: row.id,
+    updated_at: row.updated_at,
+  };
+}
+
+/**
  * Creates a user and their first session in a single transaction.
  * Avoids the race where createUser succeeds but createSession fails, leaving an orphan user.
  * Throws with code "23505" when email is already registered.

@@ -69,25 +69,11 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
   const { email, password } = parsed.data;
-  const user = await authRepo.findUserByEmail(email);
+  const user = await authRepo.authenticate(email, password);
   if (!user) {
     logger.warn(
-      { event: 'login_failure', reason: 'user_not_found', ip: req.ip },
-      'Login failed: user not found',
-    );
-    res.status(401).json({ error: { message: 'Invalid email or password' } });
-    return;
-  }
-  const valid = await authRepo.verifyPassword(password, user.password_hash);
-  if (!valid) {
-    logger.warn(
-      {
-        event: 'login_failure',
-        reason: 'wrong_password',
-        userId: user.id,
-        ip: req.ip,
-      },
-      'Login failed: wrong password',
+      { event: 'login_failure', ip: req.ip },
+      'Login failed: invalid credentials',
     );
     res.status(401).json({ error: { message: 'Invalid email or password' } });
     return;
