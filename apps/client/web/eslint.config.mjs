@@ -34,7 +34,7 @@ export default tseslint.config([
       'unused-imports': unusedImports,
     },
     rules: {
-      'curly': 'error',
+      curly: 'error',
       'import/no-anonymous-default-export': 'off',
       'no-console': ['warn', { allow: ['warn', 'info', 'error', 'group'] }],
       'no-implicit-globals': 'error',
@@ -78,7 +78,10 @@ export default tseslint.config([
       react: { version: 'detect' },
     },
     rules: {
-      '@typescript-eslint/ban-ts-comment': ['warn', { 'ts-ignore': 'allow-with-description' }],
+      '@typescript-eslint/ban-ts-comment': [
+        'warn',
+        { 'ts-ignore': 'allow-with-description' },
+      ],
       '@typescript-eslint/consistent-type-definitions': 'off',
       '@typescript-eslint/consistent-type-imports': [
         'warn',
@@ -131,7 +134,7 @@ export default tseslint.config([
       '**/*.test.tsx',
     ],
     languageOptions: {
-      globals: { ...globals.jest },
+      globals: { ...globals.vitest },
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',

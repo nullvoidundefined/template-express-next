@@ -39,13 +39,13 @@ No special Next config is required for a normal workspace layout; keep `next.con
 
 Use `pnpm <script>` or `npm run <script>` (same names; yarn: `yarn <script>`).
 
-| Script   | Description                         |
-| -------- | ----------------------------------- |
-| `dev`    | Dev server (Turbopack via Next)     |
-| `build`  | Production build                    |
-| `start`  | Serve production build              |
-| `lint`   | ESLint (`next lint`)                |
-| `format` | Prettier (`--write` on project)     |
+| Script   | Description                     |
+| -------- | ------------------------------- |
+| `dev`    | Dev server (Turbopack via Next) |
+| `build`  | Production build                |
+| `start`  | Serve production build          |
+| `lint`   | ESLint (`next lint`)            |
+| `format` | Prettier (`--write` on project) |
 
 ## Layout
 

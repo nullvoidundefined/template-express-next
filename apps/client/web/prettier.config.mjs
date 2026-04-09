@@ -15,6 +15,12 @@ export default {
   jsxSingleQuote: true,
   overrides: [
     {
+      files: ['*.md'],
+      options: {
+        embeddedLanguageFormatting: 'off',
+      },
+    },
+    {
       files: ['*.json'],
       options: {
         parser: 'json5',
