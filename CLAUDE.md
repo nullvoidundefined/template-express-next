@@ -1,6 +1,6 @@
-# template-express-next
+# Doppelscript
 
-Express 5 + Next.js 15 monorepo template. This file is auto-loaded on every session and contains rules that apply to the whole repo. Workspace-specific conventions live next to the code they govern:
+Express 5 + Next.js 15 monorepo for Doppelscript. This file is auto-loaded on every session and contains rules that apply to the whole repo. Workspace-specific conventions live next to the code they govern:
 
 - `apps/client/web/CLAUDE.md` for frontend, styling, component patterns, TanStack Query, no-Tailwind, per-component folders, `displayName`, `data-test-id`, Vercel deployment (auto-loaded when working in `apps/client/web/`)
 - `apps/client/CLAUDE.md` for shared React and TypeScript conventions across all client surfaces (auto-loaded when working in `apps/client/`)

@@ -15,8 +15,8 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  description: 'Express 5 + Next.js 15 + TypeScript monorepo template',
-  title: 'template-express-next',
+  description: 'Express 5 + Next.js 15 + TypeScript monorepo for Doppelscript',
+  title: 'Doppelscript',
 };
 
 function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,6 +1,6 @@
-# template-express-next
+# Doppelscript
 
-Production-ready monorepo template for fullstack TypeScript applications. Express 5 API on Railway, Next.js 15 frontend on Vercel, PostgreSQL on Neon.
+<!-- TODO -->
 
 ## Stack
 
@@ -21,6 +21,7 @@ packages/client-shared/  Shared API wrapper, Zod schemas, utilities
 ## Getting Started
 
 1. Clone and install:
+
    ```bash
    git clone <repo> my-app
    cd my-app
@@ -28,12 +29,14 @@ packages/client-shared/  Shared API wrapper, Zod schemas, utilities
    ```
 
 2. Configure the server:
+
    ```bash
    cp apps/server/.env.example apps/server/.env
    # Edit apps/server/.env and set DATABASE_URL and SESSION_SECRET
    ```
 
 3. Run migrations:
+
    ```bash
    pnpm --filter server run migrate:up
    ```
@@ -47,14 +50,14 @@ API runs at `http://localhost:3001`, web client at `http://localhost:3000`.
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `DATABASE_URL` | Yes | -- | PostgreSQL connection string |
-| `SESSION_SECRET` | Yes | -- | Secret for signing session cookies (generate with `openssl rand -hex 32`) |
-| `NODE_ENV` | No | `development` | `development` or `production` |
-| `PORT` | No | `3001` | HTTP server port |
-| `CORS_ORIGIN` | Prod | `http://localhost:3000` | Allowed origin for CORS (required in production) |
-| `DATABASE_CA_CERT` | No | -- | PEM CA cert for SSL verification (Neon, RDS) |
+| Variable           | Required | Default                 | Description                                                               |
+| ------------------ | -------- | ----------------------- | ------------------------------------------------------------------------- |
+| `DATABASE_URL`     | Yes      | --                      | PostgreSQL connection string                                              |
+| `SESSION_SECRET`   | Yes      | --                      | Secret for signing session cookies (generate with `openssl rand -hex 32`) |
+| `NODE_ENV`         | No       | `development`           | `development` or `production`                                             |
+| `PORT`             | No       | `3001`                  | HTTP server port                                                          |
+| `CORS_ORIGIN`      | Prod     | `http://localhost:3000` | Allowed origin for CORS (required in production)                          |
+| `DATABASE_CA_CERT` | No       | --                      | PEM CA cert for SSL verification (Neon, RDS)                              |
 
 ## Deployment
 
