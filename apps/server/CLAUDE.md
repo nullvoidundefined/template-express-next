@@ -14,7 +14,6 @@ Applies to all `server/` code.
 - PostgreSQL on Neon via `pg` driver. Raw SQL, no ORM.
 - Zod for request validation and type derivation.
 - Pino for structured logging.
-- Redis (ioredis) where needed.
 - Anthropic Claude API for LLM calls (if applicable).
 
 ### Directory Structure
@@ -33,8 +32,8 @@ src/
 ├── handlers/                     # HTTP request handlers (thin: validate, delegate, respond)
 │   ├── auth/
 │   │   └── auth.ts
-│   └── jobs/
-│       └── jobs.ts
+│   └── items/
+│       └── items.ts
 ├── middleware/
 │   ├── csrfGuard/
 │   │   └── csrfGuard.ts
@@ -51,14 +50,14 @@ src/
 ├── repositories/                 # Data access layer (all SQL lives here)
 │   ├── auth/
 │   │   └── auth.ts
-│   └── jobs/
-│       └── jobs.ts
+│   └── items/
+│       └── items.ts
 ├── routes/                       # Express router definitions
 │   ├── auth.ts
-│   └── jobs.ts
+│   └── items.ts
 ├── schemas/                      # Zod schemas + derived TypeScript types
 │   ├── auth.ts
-│   └── job.ts
+│   └── item.ts
 ├── services/                     # Business logic layer
 │   └── example.service.ts
 ├── types/                        # TypeScript ambient declarations
@@ -84,11 +83,11 @@ Never skip layers. Handlers call services or repositories. Repositories never ca
 | What         | Convention               | Example                        |
 | ------------ | ------------------------ | ------------------------------ |
 | Middleware   | `camelCase/camelCase.ts` | `errorHandler/errorHandler.ts` |
-| Routes       | `kebab-case.ts`          | `auth.ts`, `jobs.ts`           |
-| Handlers     | `kebab-case.ts`          | `jobs.ts`                      |
-| Repositories | `kebab-case.ts`          | `jobs.ts`, `auth.ts`           |
+| Routes       | `kebab-case.ts`          | `auth.ts`, `items.ts`          |
+| Handlers     | `kebab-case.ts`          | `items.ts`                     |
+| Repositories | `kebab-case.ts`          | `items.ts`, `auth.ts`          |
 | Services     | `kebab-case.service.ts`  | `example.service.ts`           |
-| Schemas      | `kebab-case.ts`          | `job.ts`                       |
+| Schemas      | `kebab-case.ts`          | `item.ts`                      |
 | Utils        | `camelCase.ts`           | `parsePagination.ts`           |
 | Constants    | `camelCase.ts`           | `session.ts`                   |
 
@@ -99,8 +98,8 @@ Never skip layers. Handlers call services or repositories. Repositories never ca
 // 4. Local imports by layer (config, db, middleware, repos, schemas, services, utils)
 import { corsConfig } from 'app/config/corsConfig.js';
 import { query } from 'app/db/pool/pool.js';
-import * as jobsRepo from 'app/repositories/jobs/jobs.js';
-import type { Job } from 'app/schemas/job.js';
+import * as itemsRepo from 'app/repositories/items/items.js';
+import type { Item } from 'app/schemas/item.js';
 import { logger } from 'app/utils/logs/logger.js';
 import 'dotenv/config';
 // 3. Third-party packages (alphabetical)
@@ -223,7 +222,7 @@ app.use(loadSession);
 
 // Routes
 app.use('/auth', authRouter);
-app.use('/jobs', jobsRouter);
+app.use('/items', itemsRouter);
 
 // Error handlers (always last)
 app.use(notFoundHandler);
@@ -233,20 +232,20 @@ app.use(errorHandler);
 ### Router Pattern
 
 ```typescript
-import * as jobHandlers from 'app/handlers/jobs/jobs.js';
+import * as itemHandlers from 'app/handlers/items/items.js';
 import { requireAuth } from 'app/middleware/requireAuth/requireAuth.js';
 import express from 'express';
 
-const jobsRouter = express.Router();
+const itemsRouter = express.Router();
 
-jobsRouter.use(requireAuth);
-jobsRouter.get('/', jobHandlers.listJobs);
-jobsRouter.post('/', jobHandlers.createJob);
-jobsRouter.get('/:id', jobHandlers.getJob);
-jobsRouter.put('/:id', jobHandlers.updateJob);
-jobsRouter.delete('/:id', jobHandlers.deleteJob);
+itemsRouter.use(requireAuth);
+itemsRouter.get('/', itemHandlers.listItems);
+itemsRouter.post('/', itemHandlers.createItem);
+itemsRouter.get('/:id', itemHandlers.getItem);
+itemsRouter.put('/:id', itemHandlers.updateItem);
+itemsRouter.delete('/:id', itemHandlers.deleteItem);
 
-export { jobsRouter };
+export { itemsRouter };
 ```
 
 - Import handlers with `import * as` namespace import.
@@ -256,20 +255,20 @@ export { jobsRouter };
 ### Handler Pattern
 
 ```typescript
-import * as jobsRepo from 'app/repositories/jobs/jobs.js';
-import { createJobSchema } from 'app/schemas/job.js';
+import * as itemsRepo from 'app/repositories/items/items.js';
+import { createItemSchema } from 'app/schemas/item.js';
 import type { Request, Response } from 'express';
 
-export async function createJob(req: Request, res: Response): Promise<void> {
-  const parsed = createJobSchema.safeParse(req.body);
+export async function createItem(req: Request, res: Response): Promise<void> {
+  const parsed = createItemSchema.safeParse(req.body);
   if (!parsed.success) {
     const message = parsed.error.issues.map((e) => e.message).join('; ');
     res.status(400).json({ error: { message } });
     return;
   }
 
-  const job = await jobsRepo.createJob(req.user!.id, parsed.data);
-  res.status(201).json({ data: job });
+  const item = await itemsRepo.createItem(req.user!.id, parsed.data);
+  res.status(201).json({ data: item });
 }
 ```
 
@@ -282,11 +281,11 @@ export async function createJob(req: Request, res: Response): Promise<void> {
 
 ```typescript
 // Success, single resource
-res.json({ data: job });
-res.status(201).json({ data: job });
+res.json({ data: item });
+res.status(201).json({ data: item });
 
 // Success, collection with pagination
-res.json({ data: jobs, meta: { total, limit, offset } });
+res.json({ data: items, meta: { total, limit, offset } });
 
 // Error
 res.status(400).json({ error: { message: 'Validation failed' } });
@@ -304,7 +303,7 @@ Schemas live in `src/schemas/` alongside their derived types:
 ```typescript
 import { z } from 'zod';
 
-export const jobSchema = z.object({
+export const itemSchema = z.object({
   id: z.string().uuid(),
   user_id: z.string().uuid(),
   title: z.string().nullable(),
@@ -312,13 +311,12 @@ export const jobSchema = z.object({
   updated_at: z.coerce.date().nullable(),
 });
 
-export const createJobSchema = z.object({
+export const createItemSchema = z.object({
   title: z.string().max(255).optional(),
-  company: z.string().max(255).optional(),
 });
 
-export type Job = z.infer<typeof jobSchema>;
-export type CreateJobInput = z.infer<typeof createJobSchema>;
+export type Item = z.infer<typeof itemSchema>;
+export type CreateItemInput = z.infer<typeof createItemSchema>;
 ```
 
 - Schema names: camelCase plus `Schema` suffix.
@@ -330,28 +328,28 @@ export type CreateJobInput = z.infer<typeof createJobSchema>;
 
 ```typescript
 import { query } from 'app/db/pool/pool.js';
-import type { Job } from 'app/schemas/job.js';
+import type { Item } from 'app/schemas/item.js';
 
-export async function getJobById(
+export async function getItemById(
   id: string,
   userId: string,
-): Promise<Job | null> {
-  const result = await query<Job>(
-    `SELECT * FROM jobs WHERE id = $1 AND user_id = $2`,
+): Promise<Item | null> {
+  const result = await query<Item>(
+    `SELECT * FROM items WHERE id = $1 AND user_id = $2`,
     [id, userId],
   );
   return result.rows[0] ?? null;
 }
 
-export async function createJob(
+export async function createItem(
   userId: string,
-  input: CreateJobInput,
-): Promise<Job> {
-  const result = await query<Job>(
-    `INSERT INTO jobs (user_id, title, company)
-         VALUES ($1, $2, $3)
+  input: CreateItemInput,
+): Promise<Item> {
+  const result = await query<Item>(
+    `INSERT INTO items (user_id, title)
+         VALUES ($1, $2)
          RETURNING *`,
-    [userId, input.title ?? null, input.company ?? null],
+    [userId, input.title ?? null],
   );
   const row = result.rows[0];
   if (!row) throw new Error('Insert returned no row');
@@ -363,7 +361,7 @@ export async function createJob(
 - Every query includes `user_id` scoping for multi-tenant safety.
 - Return `null` for not-found, not empty arrays.
 - `RETURNING *` on inserts and updates.
-- Named exports, imported as namespace: `import * as jobsRepo from '...'`.
+- Named exports, imported as namespace: `import * as itemsRepo from '...'`.
 
 ### Error Handling (Backend)
 
@@ -401,7 +399,7 @@ logger.warn(
   { event: 'login_failure', reason: 'user_not_found' },
   'Login failed',
 );
-logger.error({ err, jobId }, 'Failed to process job');
+logger.error({ err, itemId }, 'Failed to process item');
 logger.debug({ hash }, 'Cache hit');
 ```
 
@@ -434,21 +432,21 @@ const pool = new Pool({
 
 ### Export Patterns
 
-| What          | Export Style                                       | Import Style                                |
-| ------------- | -------------------------------------------------- | ------------------------------------------- |
-| Handlers      | Named: `export async function listJobs(...)`       | `import * as jobHandlers from '...'`        |
-| Repositories  | Named: `export async function getJobById(...)`     | `import * as jobsRepo from '...'`           |
-| Services      | Named: `export async function analyzeJob(...)`     | `import { analyzeJob } from '...'`          |
-| Schemas/Types | Named: `export const jobSchema`, `export type Job` | `import { jobSchema, type Job } from '...'` |
-| Routers       | Named: `export { jobsRouter }`                     | `import { jobsRouter } from '...'`          |
-| Middleware    | Named: `export function requireAuth(...)`          | `import { requireAuth } from '...'`         |
-| Logger        | Named: `export const logger`                       | `import { logger } from '...'`              |
+| What          | Export Style                                         | Import Style                                  |
+| ------------- | ---------------------------------------------------- | --------------------------------------------- |
+| Handlers      | Named: `export async function listItems(...)`        | `import * as itemHandlers from '...'`         |
+| Repositories  | Named: `export async function getItemById(...)`      | `import * as itemsRepo from '...'`            |
+| Services      | Named: `export async function processItem(...)`      | `import { processItem } from '...'`           |
+| Schemas/Types | Named: `export const itemSchema`, `export type Item` | `import { itemSchema, type Item } from '...'` |
+| Routers       | Named: `export { itemsRouter }`                      | `import { itemsRouter } from '...'`           |
+| Middleware    | Named: `export function requireAuth(...)`            | `import { requireAuth } from '...'`           |
+| Logger        | Named: `export const logger`                         | `import { logger } from '...'`                |
 
 No default exports in the backend. Named exports only.
 
 ### TypeScript Patterns (Backend)
 
-- Types for Zod-derived models: `type Job = z.infer<typeof jobSchema>`.
+- Types for Zod-derived models: `type Item = z.infer<typeof itemSchema>`.
 - Interfaces for callback and service contracts: `interface StreamCallbacks { onToken: ... }`.
 - Types for unions: `type ProgressEvent = { type: 'tool_start'; ... } | { type: 'tool_result'; ... }`.
 - Extend Express Request in `types/express.d.ts`:
@@ -467,14 +465,14 @@ export {};
 ### RESTful Route Naming
 
 ```
-GET    /jobs              # list (paginated)
-POST   /jobs              # create
-GET    /jobs/:id          # get single
-PUT    /jobs/:id          # full update
-PATCH  /jobs/:id          # partial update
-DELETE /jobs/:id          # delete
-POST   /jobs/analyze      # action on collection
-GET    /links/:id/summary # nested resource
+GET    /items              # list (paginated)
+POST   /items              # create
+GET    /items/:id          # get single
+PUT    /items/:id          # full update
+PATCH  /items/:id          # partial update
+DELETE /items/:id          # delete
+POST   /items/process      # action on collection
+GET    /items/:id/details  # nested resource
 ```
 
 ### Testing (Backend)
@@ -487,12 +485,12 @@ GET    /links/:id/summary # nested resource
 Handler tests mock the repository layer and test HTTP behavior:
 
 ```typescript
-vi.mock('app/repositories/jobs/jobs.js');
+vi.mock('app/repositories/items/items.js');
 
-describe('GET /jobs', () => {
-  it('returns 200 with jobs list', async () => {
-    vi.mocked(jobsRepo.listJobs).mockResolvedValue([mockJob]);
-    const res = await request(app).get('/jobs').set('Cookie', sessionCookie);
+describe('GET /items', () => {
+  it('returns 200 with items list', async () => {
+    vi.mocked(itemsRepo.listItems).mockResolvedValue([mockItem]);
+    const res = await request(app).get('/items').set('Cookie', sessionCookie);
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
   });
@@ -530,7 +528,7 @@ export const shorthands = undefined;
  * @param pgm {import('node-pg-migrate').MigrationBuilder}
  */
 export const up = (pgm) => {
-  pgm.createTable('jobs', {
+  pgm.createTable('items', {
     id: {
       type: 'uuid',
       primaryKey: true,
@@ -543,20 +541,19 @@ export const up = (pgm) => {
       onDelete: 'CASCADE',
     },
     title: { type: 'varchar(255)' },
-    status: { type: 'varchar(50)', notNull: true, default: 'saved' },
     created_at: { type: 'timestamptz', default: pgm.func('NOW()') },
     updated_at: { type: 'timestamptz', default: pgm.func('NOW()') },
   });
 
-  pgm.createIndex('jobs', 'user_id');
-  pgm.createIndex('jobs', 'created_at');
+  pgm.createIndex('items', 'user_id');
+  pgm.createIndex('items', 'created_at');
 };
 
 /**
  * @param pgm {import('node-pg-migrate').MigrationBuilder}
  */
 export const down = (pgm) => {
-  pgm.dropTable('jobs');
+  pgm.dropTable('items');
 };
 ```
 
@@ -572,7 +569,7 @@ Rules:
 
 ### Schema Conventions
 
-Table naming: plural, lowercase, snake_case: `users`, `jobs`, `link_tags`. Junction tables combine both names.
+Table naming: plural, lowercase, snake_case: `users`, `items`, `item_tags`. Junction tables combine both names.
 
 Column naming: snake*case exclusively. Foreign keys: `{referenced_table_singular}_id`. Boolean columns: prefix with `is*`or`has\_`.
 
@@ -606,8 +603,8 @@ Custom ENUM types: `pgm.createType(...)` before the tables that use them, `pgm.d
 ### Indexes
 
 ```javascript
-pgm.createIndex('jobs', 'user_id');
-pgm.createIndex('jobs', 'created_at');
+pgm.createIndex('items', 'user_id');
+pgm.createIndex('items', 'created_at');
 pgm.createIndex('messages', ['conversation_id', 'created_at']);
 ```
 

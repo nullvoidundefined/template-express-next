@@ -158,8 +158,8 @@ Every workspace places tests in `src/__tests__/`, mirroring the source tree one-
 ```
 src/
 ├── handlers/
-│   └── jobs/
-│       └── jobs.ts
+│   └── auth/
+│       └── auth.ts
 ├── services/
 │   └── example.service.ts
 ├── components/
@@ -167,8 +167,8 @@ src/
 │       └── Button.tsx
 └── __tests__/
     ├── handlers/
-    │   └── jobs/
-    │       └── jobs.test.ts
+    │   └── auth/
+    │       └── auth.test.ts
     ├── services/
     │   └── example.service.test.ts
     └── components/
@@ -178,9 +178,9 @@ src/
 
 Rules:
 
-- The path inside `__tests__/` matches the path inside `src/` exactly. `src/handlers/jobs/jobs.ts` has its test at `src/__tests__/handlers/jobs/jobs.test.ts`.
+- The path inside `__tests__/` matches the path inside `src/` exactly. `src/handlers/auth/auth.ts` has its test at `src/__tests__/handlers/auth/auth.test.ts`.
 - One test file per source file. Do not split a file's tests across multiple test files.
-- Integration tests that span multiple layers go in `src/__tests__/integration/`. Name them after the flow they test: `auth-flow.test.ts`, `create-job.test.ts`.
+- Integration tests that span multiple layers go in `src/__tests__/integration/`. Name them after the flow they test: `auth-flow.test.ts`, `create-item.test.ts`.
 - Test utilities and shared fixtures go in `src/__tests__/helpers/`. Never import from outside this directory in test files.
 - `vitest.config.ts` at each workspace root sets `include: ['src/__tests__/**/*.test.ts']` (or `.tsx`).
 
