@@ -1,12 +1,14 @@
 import { requestLogger } from 'app/middleware/requestLogger/requestLogger.js';
 import express from 'express';
-import pino from 'pino';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('app/utils/logs/logger.js', () => ({
-  logger: pino({ level: 'silent' }),
-}));
+vi.mock('app/utils/logs/logger.js', async () => {
+  const { default: pino } = await import('pino');
+  return {
+    logger: pino({ level: 'silent' }),
+  };
+});
 
 const app = express();
 app.use(requestLogger);
