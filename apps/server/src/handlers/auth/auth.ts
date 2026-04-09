@@ -1,9 +1,19 @@
 import { isProduction } from 'app/config/env.js';
 import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from 'app/constants/session.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
+import type { User } from 'app/schemas/auth.js';
 import { loginSchema, registerSchema } from 'app/schemas/auth.js';
 import { logger } from 'app/utils/logs/logger.js';
 import type { Request, Response } from 'express';
+
+function toUserResponse(user: User) {
+  return {
+    createdAt: user.created_at,
+    email: user.email,
+    id: user.id,
+    updatedAt: user.updated_at,
+  };
+}
 
 function sessionCookieOptions() {
   return {
@@ -33,9 +43,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       'User registered',
     );
     res.cookie(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions());
-    res.status(201).json({
-      user: { id: user.id, email: user.email, created_at: user.created_at },
-    });
+    res.status(201).json({ user: toUserResponse(user) });
   } catch (err) {
     const code =
       err && typeof err === 'object' && 'code' in err
@@ -90,9 +98,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     'User logged in',
   );
   res.cookie(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions());
-  res.json({
-    user: { id: user.id, email: user.email, created_at: user.created_at },
-  });
+  res.json({ user: toUserResponse(user) });
 }
 
 export async function logout(req: Request, res: Response): Promise<void> {
@@ -111,5 +117,5 @@ export async function logout(req: Request, res: Response): Promise<void> {
 }
 
 export async function me(req: Request, res: Response): Promise<void> {
-  res.json({ user: req.user });
+  res.json({ user: toUserResponse(req.user!) });
 }

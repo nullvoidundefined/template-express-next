@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api } from '@/services/api';
 
-// TODO: move to @repo/types once the server also consumes this shape
+// TODO: move to @repo/types
 export type User = {
     createdAt: string;
     email: string;
     id: string;
+    updatedAt: string | null;
 };
 
 type AuthResponse = { user: User };

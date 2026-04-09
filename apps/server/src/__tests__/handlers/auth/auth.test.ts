@@ -72,9 +72,10 @@ describe('auth handlers', () => {
 
       expect(res.status).toBe(201);
       expect(res.body.user).toEqual({
-        id,
+        createdAt: '2025-01-01T00:00:00.000Z',
         email: 'user@example.com',
-        created_at: '2025-01-01T00:00:00.000Z',
+        id,
+        updatedAt: null,
       });
       expect(res.headers['set-cookie']).toBeDefined();
       expect(authRepo.createUserAndSession).toHaveBeenCalledWith(
@@ -145,9 +146,10 @@ describe('auth handlers', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.user).toEqual({
-        id,
+        createdAt: '2025-01-01T00:00:00.000Z',
         email: 'user@example.com',
-        created_at: '2025-01-01T00:00:00.000Z',
+        id,
+        updatedAt: null,
       });
       expect(res.headers['set-cookie']).toBeDefined();
       expect(authRepo.loginUser).toHaveBeenCalledWith(id);
@@ -205,10 +207,10 @@ describe('auth handlers', () => {
       const res = await request(app).get('/me').set('x-test-user', '1');
       expect(res.status).toBe(200);
       expect(res.body.user).toEqual({
-        id,
+        createdAt: '2025-01-01T00:00:00.000Z',
         email: 'user@example.com',
-        created_at: '2025-01-01T00:00:00.000Z',
-        updated_at: null,
+        id,
+        updatedAt: null,
       });
     });
   });
