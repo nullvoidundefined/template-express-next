@@ -10,31 +10,31 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
 # --- Dependencies ---
 FROM base AS deps
-COPY server/package.json server/package.json
-COPY web-client/package.json web-client/package.json
+COPY apps/server/package.json apps/server/package.json
+COPY apps/client/web/package.json apps/client/web/package.json
 RUN LEFTHOOK=0 pnpm install --frozen-lockfile
 # Install Playwright Chromium + all required system dependencies
 RUN node_modules/.pnpm/node_modules/.bin/playwright install chromium --with-deps
 
 # --- Build server ---
 FROM deps AS build-server
-COPY server/ server/
-RUN pnpm --filter ./server run build
+COPY apps/server/ apps/server/
+RUN pnpm --filter ./apps/server run build
 
 # --- Build web client (for local/CI use) ---
 FROM deps AS build-web
-COPY web-client/ web-client/
-RUN pnpm --filter web-client run build
+COPY apps/client/web/ apps/client/web/
+RUN pnpm --filter web run build
 
-# --- Production server (LAST STAGE — used by Railway) ---
+# --- Production server (used by Railway) ---
 FROM base AS server
 COPY --from=deps /app/node_modules node_modules
-COPY --from=deps /app/server/node_modules server/node_modules
+COPY --from=deps /app/apps/server/node_modules apps/server/node_modules
 COPY --from=deps /ms-playwright /ms-playwright
-COPY --from=build-server /app/server/dist server/dist
-COPY server/migrations server/migrations
+COPY --from=build-server /app/apps/server/dist apps/server/dist
+COPY apps/server/migrations apps/server/migrations
 COPY package.json pnpm-workspace.yaml ./
 # Start script: run migrations then start server
-RUN printf '#!/bin/sh\nset -e\nserver/node_modules/.bin/node-pg-migrate -m server/migrations up\nexec node server/dist/index.js\n' > /app/start.sh && chmod +x /app/start.sh
+RUN printf '#!/bin/sh\nset -e\napps/server/node_modules/.bin/node-pg-migrate -m apps/server/migrations up\nexec node apps/server/dist/index.js\n' > /app/start.sh && chmod +x /app/start.sh
 EXPOSE 3001
 CMD ["/app/start.sh"]

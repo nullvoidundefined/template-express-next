@@ -1,0 +1,228 @@
+.page {
+    background: #080808;
+    color: #d8d8d8;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-geist-mono), monospace;
+    min-height: 100vh;
+}
+
+// Top bar
+.topBar {
+    border-bottom: 1px solid #161616;
+    display: flex;
+    justify-content: space-between;
+    padding: 18px 40px;
+}
+
+.topBarLabel {
+    color: #383838;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.topBarMeta {
+    color: #2a2a2a;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+// Hero
+.hero {
+    border-bottom: 1px solid #161616;
+    padding: 72px 40px 52px;
+}
+
+.title {
+    display: flex;
+    flex-direction: column;
+    line-height: 0.88;
+    margin-bottom: 28px;
+}
+
+.titleTemplate {
+    color: #efefef;
+    font-family: var(--font-geist-sans), sans-serif;
+    font-size: clamp(52px, 9.6vw, 108px);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+}
+
+.titleStack {
+    color: var(--accent, #e8651a);
+    font-family: var(--font-geist-mono), monospace;
+    font-size: clamp(22px, 4.2vw, 48px);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+}
+
+.tagline {
+    color: #363636;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+// Stack bar
+.stackBar {
+    border-bottom: 1px solid #161616;
+    display: flex;
+}
+
+.stackItem {
+    border-right: 1px solid #161616;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 5px;
+    padding: 20px 24px;
+    transition: background var(--transition-hover, 0.15s);
+
+    &:last-child {
+        border-right: none;
+    }
+
+    &:hover {
+        background: #0d0d0d;
+    }
+}
+
+.stackName {
+    color: #d0d0d0;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.stackSub {
+    color: #2e2e2e;
+    font-size: 11px;
+}
+
+// Two-column grid
+.grid {
+    border-bottom: 1px solid #161616;
+    display: grid;
+    flex: 1;
+    grid-template-columns: 1fr 1fr;
+}
+
+.panel {
+    padding: 40px;
+
+    &:first-child {
+        border-right: 1px solid #161616;
+    }
+}
+
+.panelLabel {
+    color: #2e2e2e;
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.14em;
+    margin-bottom: 20px;
+    text-transform: uppercase;
+}
+
+// Terminal commands
+.terminal {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+}
+
+.cmdLine {
+    align-items: center;
+    display: flex;
+    gap: 12px;
+}
+
+.prompt {
+    color: var(--accent, #e8651a);
+    font-size: 13px;
+    user-select: none;
+}
+
+.cmd {
+    color: #b8b8b8;
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 13px;
+}
+
+// Workspace list
+.workspaceList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.workspaceLine {
+    align-items: baseline;
+    display: flex;
+    gap: 16px;
+}
+
+.workspacePath {
+    color: #b8b8b8;
+    font-family: var(--font-geist-mono), monospace;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.workspaceDesc {
+    color: #2e2e2e;
+    font-size: 11px;
+}
+
+// Footer
+.footer {
+    padding: 18px 40px;
+}
+
+.footerNote {
+    color: #222;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+}
+
+// Responsive
+@media (max-width: 720px) {
+    .topBar {
+        padding: 16px 20px;
+    }
+
+    .hero {
+        padding: 48px 20px 36px;
+    }
+
+    .stackBar {
+        flex-wrap: wrap;
+    }
+
+    .stackItem {
+        border-bottom: 1px solid #161616;
+        flex: 0 0 50%;
+
+        &:nth-child(even) {
+            border-right: none;
+        }
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .panel {
+        padding: 28px 20px;
+
+        &:first-child {
+            border-bottom: 1px solid #161616;
+            border-right: none;
+        }
+    }
+
+    .footer {
+        padding: 16px 20px;
+    }
+}

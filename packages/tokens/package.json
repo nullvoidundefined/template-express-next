@@ -1,0 +1,23 @@
+{
+  "name": "@repo/tokens",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./scss": "./dist/_tokens.scss"
+  },
+  "scripts": {
+    "build": "tsc && node dist/generate-scss.js",
+    "generate": "node dist/generate-scss.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

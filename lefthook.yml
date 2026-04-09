@@ -4,9 +4,9 @@ pre-commit:
     lint:
       run: pnpm -r run lint
     format:
-      run: pnpm --filter server run format:check
+      run: pnpm --filter ./apps/server run format:check
 
 pre-push:
   commands:
     tests:
-      run: pnpm --filter server run test:coverage
+      run: pnpm --filter ./apps/server run test:coverage

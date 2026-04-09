@@ -8,12 +8,12 @@
   },
   "scripts": {
     "dev": "pnpm --parallel run dev",
-    "build": "pnpm --filter ./server build && pnpm --filter ./web-client build",
+    "build": "pnpm --filter ./apps/server build && pnpm --filter ./apps/client/web build",
     "lint": "pnpm -r run lint",
     "format": "pnpm -r run format",
     "format:check": "pnpm -r run format:check",
-    "test": "pnpm --filter ./server run test",
-    "test:coverage": "pnpm --filter ./server run test:coverage",
+    "test": "pnpm --filter ./apps/server run test",
+    "test:coverage": "pnpm --filter ./apps/server run test:coverage",
     "prepare": "lefthook install || true"
   },
   "devDependencies": {
