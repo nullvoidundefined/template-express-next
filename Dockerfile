@@ -2,7 +2,6 @@
 FROM node:22 AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 RUN corepack enable
 
 WORKDIR /app
@@ -13,8 +12,6 @@ FROM base AS deps
 COPY apps/server/package.json apps/server/package.json
 COPY apps/client/web/package.json apps/client/web/package.json
 RUN LEFTHOOK=0 pnpm install --frozen-lockfile
-# Install Playwright Chromium + all required system dependencies
-RUN node_modules/.pnpm/node_modules/.bin/playwright install chromium --with-deps
 
 # --- Build server ---
 FROM deps AS build-server
@@ -30,7 +27,6 @@ RUN pnpm --filter web run build
 FROM base AS server
 COPY --from=deps /app/node_modules node_modules
 COPY --from=deps /app/apps/server/node_modules apps/server/node_modules
-COPY --from=deps /ms-playwright /ms-playwright
 COPY --from=build-server /app/apps/server/dist apps/server/dist
 COPY apps/server/migrations apps/server/migrations
 COPY package.json pnpm-workspace.yaml ./
