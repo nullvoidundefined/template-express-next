@@ -1,12 +1,23 @@
 pre-commit:
   parallel: true
   commands:
-    lint:
-      run: pnpm -r run lint
-    format:
+    lint-server:
+      glob: "apps/server/**/*.{ts,js,mjs}"
+      run: pnpm --filter ./apps/server run lint
+    lint-web:
+      glob: "apps/client/web/**/*.{ts,tsx,js,mjs}"
+      run: pnpm --filter ./apps/client/web run lint
+    format-server:
+      glob: "apps/server/**"
       run: pnpm --filter ./apps/server run format:check
+    format-web:
+      glob: "apps/client/web/**"
+      run: pnpm --filter ./apps/client/web run format:check
 
 pre-push:
+  parallel: true
   commands:
-    tests:
+    test-server:
       run: pnpm --filter ./apps/server run test:coverage
+    test-web:
+      run: pnpm --filter ./apps/client/web run test
