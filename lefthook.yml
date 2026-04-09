@@ -2,17 +2,37 @@ pre-commit:
   parallel: true
   commands:
     lint-server:
-      glob: "apps/server/**/*.{ts,js,mjs}"
+      glob: 'apps/server/**/*.{ts,js,mjs}'
       run: pnpm --filter ./apps/server run lint
     lint-web:
-      glob: "apps/client/web/**/*.{ts,tsx,js,mjs}"
+      glob: 'apps/client/web/**/*.{ts,tsx,js,mjs}'
       run: pnpm --filter ./apps/client/web run lint
     format-server:
-      glob: "apps/server/**"
+      glob: 'apps/server/**'
       run: pnpm --filter ./apps/server run format:check
     format-web:
-      glob: "apps/client/web/**"
+      glob: 'apps/client/web/**'
       run: pnpm --filter ./apps/client/web run format:check
+    no-em-dash:
+      glob: '*.{ts,tsx,js,mjs,md,scss,css,yaml,yml}'
+      run: |
+        EMDASH=$(printf '\xe2\x80\x94')
+        if grep -rn "$EMDASH" {staged_files} 2>/dev/null; then
+          echo 'Em dash (U+2014) found in staged files. Use period, comma, colon, or en dash instead.'
+          exit 1
+        fi
+
+commit-msg:
+  commands:
+    fix-requires-test:
+      run: |
+        subject=$(head -1 {1})
+        if echo "$subject" | grep -qE '^(fix|bug|bugfix|hotfix)(\(.+\))?!?:'; then
+          if ! git diff --cached --name-only | grep -qE '\.(test|spec)\.(ts|tsx|js|jsx)$'; then
+            echo 'Commits with fix:/bug:/bugfix:/hotfix: subjects require at least one test file staged.'
+            exit 1
+          fi
+        fi
 
 pre-push:
   parallel: true
