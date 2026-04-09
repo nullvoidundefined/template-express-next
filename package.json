@@ -1,5 +1,5 @@
 {
-  "name": "deployments-health-check-dashboard",
+  "name": "template-express-next",
   "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@9.15.9",
