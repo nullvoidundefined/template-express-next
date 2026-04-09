@@ -119,7 +119,7 @@ import { z } from 'zod';
 
 Every backend has two files at the entry point.
 
-`src/index.ts` loads secrets or env, then dynamically imports app code:
+`src/index.ts` is a thin shim that loads env before any module initializes:
 
 ```typescript
 // Load env / secrets before any app modules initialize
@@ -128,23 +128,47 @@ import 'dotenv/config';
 await import('app/app.js');
 ```
 
-`src/app.ts` creates and starts the Express server:
+`src/app.ts` contains everything else: the Express app, all middleware and routes, the pool error listener, process signal handlers (SIGTERM/SIGINT), the session cleanup interval, graceful shutdown logic, and the `app.listen()` call. It does not export the `app` instance; `index.ts` dynamically imports `app.ts` for side effects only.
 
 ```typescript
+import { pool, query } from 'app/db/pool/pool.js';
 import express from 'express';
-import http from 'node:http';
+
+validateEnv();
 
 export const app = express();
-// ... middleware and routes
+// ... middleware, routes, health endpoints, error handlers
 
-const port = Number(process.env.PORT) || 3001;
-const server = http.createServer(app);
-server.listen(port, () => {
-  logger.info({ port }, 'Server started');
+const PORT = Number(process.env.PORT) || 3001;
+
+pool.on('error', (err) => {
+  logger.error({ err }, 'pg pool error');
+});
+
+process.on('uncaughtException', (err) => {
+  /* log and exit */
+});
+process.on('unhandledRejection', (reason) => {
+  /* log and exit */
+});
+
+const server = app.listen(PORT, '0.0.0.0', () =>
+  logger.info({ port: PORT }, 'Server running'),
+);
+
+async function shutdown(signal: string): Promise<void> {
+  // close server, then pool.end(), then process.exit(0)
+}
+
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
+process.on('SIGINT', () => {
+  void shutdown('SIGINT');
 });
 ```
 
-This two-file pattern ensures any secrets or config are populated in `process.env` before SDK clients are constructed.
+**Why everything is in `app.ts`:** the pool, the server, and the shutdown handler must share the same pool and server references. Splitting them across files creates reference-passing complexity for no benefit. The two-file split exists solely to ensure `dotenv/config` runs before any module accesses `process.env`; that guarantee is achieved by `index.ts`'s dynamic import.
 
 ### Build Tool
 
