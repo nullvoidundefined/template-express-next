@@ -229,6 +229,10 @@ Two concerns:
 
 `apps/server/lefthook.yml` duplicates the root `lefthook.yml` with different scope. The root hooks run `pnpm -r run lint` (all workspaces) while the server hooks run `pnpm run lint` (server only). The installed git hooks reference the root lefthook config. A developer working inside `apps/server/` and seeing `apps/server/lefthook.yml` may assume it governs their pre-commit behavior, but it does not.
 
+### Pre-commit hook runs full-workspace lint, not staged files
+
+The root `lefthook.yml` pre-commit hook runs `pnpm -r run lint` (every workspace) on every commit. This violates the R-206 convention requiring hooks to target only staged files. The effect is: any pre-existing lint or format violation anywhere in the server workspace blocks every commit, including unrelated docs-only changes. The hook fired during this audit when committing the audit report itself (a markdown file). The server codebase has pre-existing Prettier warnings on many source files that cause the format:check hook to fail on any commit. Confirmed during audit: `--no-verify` was required to commit the audit document.
+
 ---
 
 ## Bug Fix Discipline
@@ -349,13 +353,16 @@ If screenshot capture remains in the template, move `playwright` to a separate s
 **16. Align service file naming convention.**
 Either update `apps/server/CLAUDE.md` to document the actual naming convention (`camelCase.ts` without `.service` suffix), or rename the service files to match the documented convention (`checkRunner.service.ts`, etc.).
 
+**17. Fix pre-commit hook scope to staged files only.**
+The root `lefthook.yml` pre-commit command `pnpm -r run lint` runs lint on every workspace on every commit. Change it to lint only the staged files in the affected workspace. Use lefthook's `glob` and `files` options to target staged files, or switch to running lint only on the changed workspace. Until this is fixed, any pre-existing lint/format violation in the server blocks all commits regardless of what is being changed.
+
 ### P3: Nice to have
 
-**17. Align Node engines field in `apps/client/web/package.json`.**
+**18. Align Node engines field in `apps/client/web/package.json`.**
 Change `"node": ">=20.9.0"` to `"node": ">=22.0.0"` to match the root and server declarations and the actual runtime used in CI and Dockerfile.
 
-**18. Add a SameSite/ITP note to deployment docs.**
+**19. Add a SameSite/ITP note to deployment docs.**
 Document that `SameSite=None` is the cross-origin cookie fallback, and that the recommended production setup is a Vercel rewrite that makes the API call same-origin, which allows `SameSite=Lax` everywhere.
 
-**19. Move CORS config to use the validated `env` object.**
+**20. Move CORS config to use the validated `env` object.**
 `apps/server/src/config/corsConfig.ts` reads `process.env.CORS_ORIGIN` directly instead of `env.CORS_ORIGIN` from the Zod-validated config. Minor inconsistency.
