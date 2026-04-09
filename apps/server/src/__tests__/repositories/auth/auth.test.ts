@@ -103,6 +103,44 @@ describe('auth repository', () => {
     expect(result).toBeNull();
   });
 
+  it('authenticate returns null when user not found', async () => {
+    mockQuery.mockResolvedValueOnce(mockResult([]));
+    const result = await authRepo.authenticate('nobody@example.com', 'pwd');
+    expect(result).toBeNull();
+  });
+
+  it('authenticate returns null when password does not match', async () => {
+    const row = {
+      id,
+      email: 'u@example.com',
+      password_hash: 'wrongHash',
+      created_at: new Date(),
+      updated_at: null,
+    };
+    mockQuery.mockResolvedValueOnce(mockResult([row]));
+    const result = await authRepo.authenticate('u@example.com', 'pwd');
+    expect(result).toBeNull();
+  });
+
+  it('authenticate returns User without password_hash when credentials valid', async () => {
+    const row = {
+      id,
+      email: 'u@example.com',
+      password_hash: 'hashed',
+      created_at: new Date(),
+      updated_at: null,
+    };
+    mockQuery.mockResolvedValueOnce(mockResult([row]));
+    const result = await authRepo.authenticate('u@example.com', 'correctpwd');
+    expect(result).toEqual({
+      id,
+      email: 'u@example.com',
+      created_at: row.created_at,
+      updated_at: null,
+    });
+    expect(result).not.toHaveProperty('password_hash');
+  });
+
   it('verifyPassword returns true when match', async () => {
     const result = await authRepo.verifyPassword('pwd', 'hashed');
     expect(result).toBe(true);
@@ -181,6 +219,30 @@ describe('auth repository', () => {
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM sessions'),
       [id],
+    );
+  });
+
+  it('deleteExpiredSessions returns count of deleted rows', async () => {
+    mockQuery.mockResolvedValueOnce(mockResult([], 3));
+    const result = await authRepo.deleteExpiredSessions();
+    expect(result).toBe(3);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('DELETE FROM sessions WHERE expires_at'),
+    );
+  });
+
+  it('loginUser deletes expired sessions for user then creates new session', async () => {
+    mockQuery
+      .mockResolvedValueOnce(mockResult([], 0)) // delete expired sessions for user
+      .mockResolvedValueOnce(mockResult([], 1)); // insert new session
+    const result = await authRepo.loginUser(id);
+    expect(typeof result).toBe('string');
+    expect(result).toHaveLength(64);
+    expect(mockQuery).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('DELETE FROM sessions WHERE user_id'),
+      [id],
+      mockClient,
     );
   });
 

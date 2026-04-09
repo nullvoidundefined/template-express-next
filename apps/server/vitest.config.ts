@@ -15,10 +15,11 @@ export default defineConfig({
         '**/config/**',
         '**/types/**',
         '**/db/**',
-        '**/rateLimiter.ts',
+        '**/rateLimiter.ts', // tested via middleware test; excluded to keep threshold honest
         '**/*.d.ts',
         'src/__tests__/**',
-        'src/index.ts',
+        'src/index.ts', // thin env-loader shim; no logic to test
+        'src/app.ts', // server bootstrap: app.listen, signal handlers, pool setup - not unit-testable
         'src/constants/**',
       ],
       provider: 'v8',
