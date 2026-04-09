@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event';
 import { useRouter } from 'next/navigation';
 import { describe, expect, it, vi } from 'vitest';
 
+const mockLogin = vi.hoisted(() => vi.fn());
+
 vi.mock('@/state/useAuth', () => ({
   useAuth: () => ({
     isLoading: false,
@@ -13,8 +15,6 @@ vi.mock('@/state/useAuth', () => ({
     user: null,
   }),
 }));
-
-const mockLogin = vi.fn();
 
 describe('LoginPage', () => {
   it('renders email and password fields', () => {
