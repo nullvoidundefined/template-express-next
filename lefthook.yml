@@ -17,6 +17,8 @@ pre-commit:
 pre-push:
   parallel: true
   commands:
+    build:
+      run: pnpm build
     test-server:
       run: pnpm --filter ./apps/server run test:coverage
     test-web:
