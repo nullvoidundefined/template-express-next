@@ -22,3 +22,6 @@ coverage/
 # Server local env
 server/.env
 .vercel
+
+# Git worktrees
+.worktrees/
