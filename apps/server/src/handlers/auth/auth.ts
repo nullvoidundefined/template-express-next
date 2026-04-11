@@ -136,7 +136,7 @@ export async function forgotPassword(
 
   // Always return 200 to prevent user enumeration
   if (!user) {
-    res.json({ message: 'If that email exists, a reset link has been sent.' });
+    res.json({ success: true });
     return;
   }
 
@@ -145,8 +145,8 @@ export async function forgotPassword(
   const resetUrl = `${clientUrl}/reset-password?token=${token}`;
 
   await sendEmail({
-    html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 1 hour.</p>`,
-    subject: 'Reset your password',
+    html: `<p>Click <a href="${resetUrl}">here</a> to reset your Doppelscript password. This link expires in 1 hour.</p>`,
+    subject: 'Reset your Doppelscript password',
     to: email,
   });
 
@@ -156,7 +156,7 @@ export async function forgotPassword(
     'Password reset email sent',
   );
 
-  res.json({ message: 'If that email exists, a reset link has been sent.' });
+  res.json({ success: true });
 }
 
 export async function resetPassword(
@@ -172,16 +172,14 @@ export async function resetPassword(
   const { newPassword, token } = parsed.data;
 
   const resetRecord = await authRepo.findPasswordResetByToken(token);
-  if (!resetRecord) {
-    res.status(400).json({ error: { message: 'Invalid or expired token' } });
-    return;
-  }
-  if (resetRecord.used_at) {
-    res.status(400).json({ error: { message: 'Token has already been used' } });
-    return;
-  }
-  if (resetRecord.expires_at < new Date()) {
-    res.status(400).json({ error: { message: 'Token has expired' } });
+  if (
+    !resetRecord ||
+    resetRecord.used_at ||
+    resetRecord.expires_at < new Date()
+  ) {
+    res
+      .status(400)
+      .json({ error: { message: 'Invalid or expired reset token' } });
     return;
   }
 
@@ -195,5 +193,5 @@ export async function resetPassword(
     'Password reset completed',
   );
 
-  res.json({ message: 'Password has been reset.' });
+  res.json({ success: true });
 }
