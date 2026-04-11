@@ -2,7 +2,14 @@ import { isProduction } from 'app/config/env.js';
 import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from 'app/constants/session.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import type { User } from 'app/schemas/auth.js';
-import { loginSchema, registerSchema } from 'app/schemas/auth.js';
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from 'app/schemas/auth.js';
+import { sendEmail } from 'app/services/email.js';
+import { trackEvent } from 'app/services/posthog.js';
 import { logger } from 'app/utils/logs/logger.js';
 import type { Request, Response } from 'express';
 
@@ -11,6 +18,11 @@ function toUserResponse(user: User) {
     createdAt: user.created_at,
     email: user.email,
     id: user.id,
+    name: {
+      alias: user.name_alias,
+      first: user.name_first,
+      last: user.name_last,
+    },
     updatedAt: user.updated_at,
   };
 }
@@ -32,12 +44,14 @@ export async function register(req: Request, res: Response): Promise<void> {
     res.status(400).json({ error: { message } });
     return;
   }
-  const { email, password } = parsed.data;
+  const { email, nameAlias, nameFirst, nameLast, password } = parsed.data;
   try {
     const { user, sessionId } = await authRepo.createUserAndSession(
       email,
       password,
+      { nameAlias, nameFirst, nameLast },
     );
+    trackEvent(user.id, 'user_registered');
     logger.info(
       { event: 'register_success', userId: user.id, ip: req.ip },
       'User registered',
@@ -79,6 +93,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     return;
   }
   const sessionId = await authRepo.loginUser(user.id);
+  trackEvent(user.id, 'user_logged_in');
   logger.info(
     { event: 'login_success', userId: user.id, ip: req.ip },
     'User logged in',
@@ -104,4 +119,81 @@ export async function logout(req: Request, res: Response): Promise<void> {
 
 export async function me(req: Request, res: Response): Promise<void> {
   res.json({ user: toUserResponse(req.user!) });
+}
+
+export async function forgotPassword(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const message = parsed.error.issues.map((e) => e.message).join('; ');
+    res.status(400).json({ error: { message } });
+    return;
+  }
+  const { email } = parsed.data;
+  const user = await authRepo.findUserByEmail(email);
+
+  // Always return 200 to prevent user enumeration
+  if (!user) {
+    res.json({ message: 'If that email exists, a reset link has been sent.' });
+    return;
+  }
+
+  const token = await authRepo.createPasswordResetToken(user.id);
+  const clientUrl = process.env.CLIENT_URL ?? 'http://localhost:3000';
+  const resetUrl = `${clientUrl}/reset-password?token=${token}`;
+
+  await sendEmail({
+    html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 1 hour.</p>`,
+    subject: 'Reset your password',
+    to: email,
+  });
+
+  trackEvent(user.id, 'password_reset_requested');
+  logger.info(
+    { event: 'password_reset_requested', userId: user.id },
+    'Password reset email sent',
+  );
+
+  res.json({ message: 'If that email exists, a reset link has been sent.' });
+}
+
+export async function resetPassword(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const message = parsed.error.issues.map((e) => e.message).join('; ');
+    res.status(400).json({ error: { message } });
+    return;
+  }
+  const { newPassword, token } = parsed.data;
+
+  const resetRecord = await authRepo.findPasswordResetByToken(token);
+  if (!resetRecord) {
+    res.status(400).json({ error: { message: 'Invalid or expired token' } });
+    return;
+  }
+  if (resetRecord.used_at) {
+    res.status(400).json({ error: { message: 'Token has already been used' } });
+    return;
+  }
+  if (resetRecord.expires_at < new Date()) {
+    res.status(400).json({ error: { message: 'Token has expired' } });
+    return;
+  }
+
+  await authRepo.updateUserPassword(resetRecord.user_id, newPassword);
+  await authRepo.markPasswordResetUsed(resetRecord.id);
+  await authRepo.deleteSessionsForUser(resetRecord.user_id);
+
+  trackEvent(resetRecord.user_id, 'password_reset_completed');
+  logger.info(
+    { event: 'password_reset_completed', userId: resetRecord.user_id },
+    'Password reset completed',
+  );
+
+  res.json({ message: 'Password has been reset.' });
 }

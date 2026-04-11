@@ -40,9 +40,12 @@ describe('loadSession', () => {
 
   it('sets req.user when session valid', async () => {
     const user = {
-      id,
-      email: 'u@example.com',
       created_at: new Date('2025-01-01'),
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
       updated_at: null,
     };
     vi.mocked(authRepo.getSessionWithUser).mockResolvedValueOnce(user);
@@ -53,9 +56,12 @@ describe('loadSession', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.user).toEqual({
-      id,
-      email: 'u@example.com',
       created_at: '2025-01-01T00:00:00.000Z',
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
       updated_at: null,
     });
     expect(authRepo.getSessionWithUser).toHaveBeenCalledWith('valid-token');
