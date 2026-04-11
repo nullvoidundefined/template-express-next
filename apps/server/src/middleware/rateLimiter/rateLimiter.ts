@@ -1,4 +1,4 @@
-import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 
 export const rateLimiter = rateLimit({
   legacyHeaders: false,
@@ -21,7 +21,7 @@ export const forgotPasswordRateLimiter = rateLimit({
     const body = req.body as { email?: unknown };
     return typeof body.email === 'string'
       ? body.email.toLowerCase()
-      : ipKeyGenerator(req);
+      : (req.ip ?? 'unknown');
   },
   legacyHeaders: false,
   limit: 3,
