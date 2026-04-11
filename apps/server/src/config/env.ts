@@ -9,7 +9,7 @@ const envSchema = z.object({
   LINKEDIN_CLIENT_ID: z.string().optional(),
   LINKEDIN_CLIENT_SECRET: z.string().optional(),
   NODE_ENV: z
-    .enum(['development', 'staging', 'production'])
+    .enum(['development', 'production', 'staging', 'test'])
     .default('development'),
   PORT: z.coerce.number().default(3001),
   POSTHOG_API_KEY: z.string().optional(),
