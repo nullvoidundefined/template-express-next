@@ -591,6 +591,22 @@ Rules:
 - Comment dependencies: `// Requires users table to exist`.
 - Drop in reverse order in `down` (constraints before tables, types after tables).
 
+### Schema Design Consistency
+
+All tables must read as if they were authored by the same principal-level developer. Drift in naming, column ordering, or structural patterns is a bug, not a style choice.
+
+Rules that enforce this:
+
+- Every table follows the same column order: primary key first, foreign keys next, domain columns in the middle, `created_at` and `updated_at` last.
+- Naming conventions (see below) apply uniformly. No table gets an exception because it was written in a hurry or copied from a different project.
+- When adding a column to an existing table, review that table's existing columns and match their exact type pattern. Do not introduce a new pattern (e.g., switching from `varchar(255)` to `text`) without updating all similar columns in the same migration.
+- When adding a new table, read the existing tables first. The new table must be structurally indistinguishable from peers at the same conceptual level.
+- Before finalizing a migration, do a consistency pass: compare column types, nullability, default expressions, and constraint patterns against at least two other tables in the schema.
+
+Symptoms of drift to fix immediately: a UUID column without `gen_random_uuid()` default, a missing `updated_at`, an `onDelete` policy that differs from all other foreign keys on user-owned data, a `text` column where all siblings use `varchar(255)`.
+
+---
+
 ### Schema Conventions
 
 Table naming: plural, lowercase, snake_case: `users`, `items`, `item_tags`. Junction tables combine both names.

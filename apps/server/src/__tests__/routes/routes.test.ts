@@ -8,16 +8,25 @@ import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('app/handlers/auth/auth.js', () => ({
-  register: (_: express.Request, res: express.Response) =>
-    res.status(201).json({ ok: true }),
+  forgotPassword: (_: express.Request, res: express.Response) =>
+    res.status(200).json({ ok: true }),
   login: (_: express.Request, res: express.Response) =>
     res.status(200).json({ ok: true }),
   logout: (_: express.Request, res: express.Response) => res.status(204).send(),
   me: (_: express.Request, res: express.Response) =>
     res.status(200).json({ ok: true }),
+  register: (_: express.Request, res: express.Response) =>
+    res.status(201).json({ ok: true }),
+  resetPassword: (_: express.Request, res: express.Response) =>
+    res.status(200).json({ ok: true }),
 }));
-vi.mock('app/utils/rateLimiter.js', () => ({
+vi.mock('app/middleware/rateLimiter/rateLimiter.js', () => ({
   authRateLimiter: (
+    _: express.Request,
+    __: express.Response,
+    next: express.NextFunction,
+  ) => next(),
+  forgotPasswordRateLimiter: (
     _: express.Request,
     __: express.Response,
     next: express.NextFunction,
@@ -49,6 +58,14 @@ describe('route wiring', () => {
     it('GET /auth/me → 401 when unauthenticated', async () => {
       const res = await request(app).get('/auth/me');
       expect(res.status).toBe(401);
+    });
+    it('POST /auth/forgot-password route exists', async () => {
+      const res = await request(app).post('/auth/forgot-password').send({});
+      expect(res.status).not.toBe(404);
+    });
+    it('POST /auth/reset-password route exists', async () => {
+      const res = await request(app).post('/auth/reset-password').send({});
+      expect(res.status).not.toBe(404);
     });
   });
 });

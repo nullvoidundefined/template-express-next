@@ -7,20 +7,42 @@ import crypto from 'node:crypto';
 
 const SALT_ROUNDS = 12;
 
-/** Hash session token for storage. Cookie holds raw token; DB holds hash so a dump doesn't expose sessions. */
-function hashSessionToken(token: string): string {
+interface NameFields {
+  nameAlias?: string;
+  nameFirst?: string;
+  nameLast?: string;
+}
+
+export interface PasswordResetRow {
+  expires_at: Date;
+  id: string;
+  used_at: Date | null;
+  user_id: string;
+}
+
+/** Hash a token for storage. Cookie/URL holds raw token; DB holds hash so a dump does not expose secrets. */
+function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
 export async function createUser(
   email: string,
   password: string,
+  nameFields?: NameFields,
   client?: PoolClient,
 ): Promise<User> {
   const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
   const result = await query<User & { password_hash: string }>(
-    'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, created_at, updated_at',
-    [email.toLowerCase().trim(), password_hash],
+    `INSERT INTO users (email, name_alias, name_first, name_last, password_hash)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING created_at, email, id, name_alias, name_first, name_last, updated_at`,
+    [
+      email.toLowerCase().trim(),
+      nameFields?.nameAlias ?? null,
+      nameFields?.nameFirst ?? null,
+      nameFields?.nameLast ?? null,
+      password_hash,
+    ],
     client,
   );
   const row = result.rows[0];
@@ -32,7 +54,8 @@ export async function findUserByEmail(
   email: string,
 ): Promise<(User & { password_hash: string }) | null> {
   const result = await query<User & { password_hash: string }>(
-    'SELECT id, email, password_hash, created_at, updated_at FROM users WHERE email = $1',
+    `SELECT created_at, email, id, name_alias, name_first, name_last, password_hash, updated_at
+     FROM users WHERE email = $1`,
     [email.toLowerCase().trim()],
   );
   return result.rows[0] ?? null;
@@ -40,7 +63,8 @@ export async function findUserByEmail(
 
 export async function findUserById(id: string): Promise<User | null> {
   const result = await query<User>(
-    'SELECT id, email, created_at, updated_at FROM users WHERE id = $1',
+    `SELECT created_at, email, id, name_alias, name_first, name_last, updated_at
+     FROM users WHERE id = $1`,
     [id],
   );
   return result.rows[0] ?? null;
@@ -58,7 +82,7 @@ export async function createSession(
   client?: PoolClient,
 ): Promise<string> {
   const token = crypto.randomBytes(32).toString('hex');
-  const idHash = hashSessionToken(token);
+  const idHash = hashToken(token);
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await query(
     'INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)',
@@ -72,9 +96,9 @@ export async function createSession(
 export async function getSessionWithUser(
   sessionId: string,
 ): Promise<User | null> {
-  const idHash = hashSessionToken(sessionId);
+  const idHash = hashToken(sessionId);
   const result = await query<User>(
-    `SELECT u.id, u.email, u.created_at, u.updated_at
+    `SELECT u.created_at, u.email, u.id, u.name_alias, u.name_first, u.name_last, u.updated_at
      FROM sessions s
      INNER JOIN users u ON u.id = s.user_id
      WHERE s.id = $1 AND s.expires_at > NOW()`,
@@ -84,7 +108,7 @@ export async function getSessionWithUser(
 }
 
 export async function deleteSession(sessionId: string): Promise<boolean> {
-  const idHash = hashSessionToken(sessionId);
+  const idHash = hashToken(sessionId);
   const result = await query(
     'DELETE FROM sessions WHERE id = $1 RETURNING id',
     [idHash],
@@ -133,6 +157,9 @@ export async function authenticate(
     created_at: row.created_at,
     email: row.email,
     id: row.id,
+    name_alias: row.name_alias,
+    name_first: row.name_first,
+    name_last: row.name_last,
     updated_at: row.updated_at,
   };
 }
@@ -145,10 +172,57 @@ export async function authenticate(
 export async function createUserAndSession(
   email: string,
   password: string,
+  nameFields?: NameFields,
 ): Promise<{ user: User; sessionId: string }> {
   return withTransaction(async (client) => {
-    const user = await createUser(email, password, client);
+    const user = await createUser(email, password, nameFields, client);
     const sessionId = await createSession(user.id, client);
-    return { user, sessionId };
+    return { sessionId, user };
   });
+}
+
+/** Generates a random token, stores its hash with a 1-hour expiry, and returns the raw token. */
+export async function createPasswordResetToken(
+  userId: string,
+): Promise<string> {
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + 3600_000);
+  await query(
+    `INSERT INTO password_resets (token_hash, user_id, expires_at)
+     VALUES ($1, $2, $3)`,
+    [tokenHash, userId, expiresAt],
+  );
+  return token;
+}
+
+/** Hashes the provided token and looks up a matching password reset row. */
+export async function findPasswordResetByToken(
+  token: string,
+): Promise<PasswordResetRow | null> {
+  const tokenHash = hashToken(token);
+  const result = await query<PasswordResetRow>(
+    `SELECT expires_at, id, used_at, user_id
+     FROM password_resets
+     WHERE token_hash = $1`,
+    [tokenHash],
+  );
+  return result.rows[0] ?? null;
+}
+
+/** Marks a password reset record as used. */
+export async function markPasswordResetUsed(id: string): Promise<void> {
+  await query('UPDATE password_resets SET used_at = NOW() WHERE id = $1', [id]);
+}
+
+/** Updates a user's password hash. */
+export async function updateUserPassword(
+  userId: string,
+  newPassword: string,
+): Promise<void> {
+  const password_hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  await query(
+    'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+    [password_hash, userId],
+  );
 }

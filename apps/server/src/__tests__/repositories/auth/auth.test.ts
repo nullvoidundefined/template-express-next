@@ -37,9 +37,12 @@ describe('auth repository', () => {
 
   it('createUser inserts and returns user', async () => {
     const row = {
-      id,
-      email: 'u@example.com',
       created_at: new Date(),
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
       updated_at: new Date(),
     };
     mockQuery.mockResolvedValueOnce(mockResult([row]));
@@ -49,7 +52,33 @@ describe('auth repository', () => {
     expect(result).toEqual(row);
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO users'),
-      ['u@example.com', 'hashed'],
+      ['u@example.com', null, null, null, 'hashed'],
+      undefined,
+    );
+  });
+
+  it('createUser passes name fields when provided', async () => {
+    const row = {
+      created_at: new Date(),
+      email: 'u@example.com',
+      id,
+      name_alias: 'Lenny',
+      name_first: 'Leonard',
+      name_last: 'Smith',
+      updated_at: new Date(),
+    };
+    mockQuery.mockResolvedValueOnce(mockResult([row]));
+
+    const result = await authRepo.createUser('u@example.com', 'password123', {
+      nameAlias: 'Lenny',
+      nameFirst: 'Leonard',
+      nameLast: 'Smith',
+    });
+
+    expect(result).toEqual(row);
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO users'),
+      ['u@example.com', 'Lenny', 'Leonard', 'Smith', 'hashed'],
       undefined,
     );
   });
@@ -63,10 +92,13 @@ describe('auth repository', () => {
 
   it('findUserByEmail returns user when found', async () => {
     const row = {
-      id,
-      email: 'u@example.com',
-      password_hash: 'hashed',
       created_at: new Date(),
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
+      password_hash: 'hashed',
       updated_at: null,
     };
     mockQuery.mockResolvedValueOnce(mockResult([row]));
@@ -87,9 +119,12 @@ describe('auth repository', () => {
 
   it('findUserById returns user when found', async () => {
     const row = {
-      id,
-      email: 'u@example.com',
       created_at: new Date(),
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
       updated_at: null,
     };
     mockQuery.mockResolvedValueOnce(mockResult([row]));
@@ -111,10 +146,13 @@ describe('auth repository', () => {
 
   it('authenticate returns null when password does not match', async () => {
     const row = {
-      id,
-      email: 'u@example.com',
-      password_hash: 'wrongHash',
       created_at: new Date(),
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
+      password_hash: 'wrongHash',
       updated_at: null,
     };
     mockQuery.mockResolvedValueOnce(mockResult([row]));
@@ -124,18 +162,24 @@ describe('auth repository', () => {
 
   it('authenticate returns User without password_hash when credentials valid', async () => {
     const row = {
-      id,
-      email: 'u@example.com',
-      password_hash: 'hashed',
       created_at: new Date(),
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
+      password_hash: 'hashed',
       updated_at: null,
     };
     mockQuery.mockResolvedValueOnce(mockResult([row]));
     const result = await authRepo.authenticate('u@example.com', 'correctpwd');
     expect(result).toEqual({
-      id,
-      email: 'u@example.com',
       created_at: row.created_at,
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
       updated_at: null,
     });
     expect(result).not.toHaveProperty('password_hash');
@@ -169,9 +213,12 @@ describe('auth repository', () => {
 
   it('getSessionWithUser returns user when session valid', async () => {
     const row = {
-      id,
-      email: 'u@example.com',
       created_at: new Date(),
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
       updated_at: null,
     };
     mockQuery.mockResolvedValueOnce(mockResult([row]));
@@ -248,9 +295,12 @@ describe('auth repository', () => {
 
   it('createUserAndSession runs user and session inserts in transaction', async () => {
     const userRow = {
-      id,
-      email: 'u@example.com',
       created_at: new Date(),
+      email: 'u@example.com',
+      id,
+      name_alias: null,
+      name_first: null,
+      name_last: null,
       updated_at: null,
     };
     mockQuery
@@ -263,7 +313,7 @@ describe('auth repository', () => {
     expect(mockQuery).toHaveBeenNthCalledWith(
       1,
       expect.stringContaining('INSERT INTO users'),
-      ['u@example.com', 'hashed'],
+      ['u@example.com', null, null, null, 'hashed'],
       mockClient,
     );
     expect(mockQuery).toHaveBeenNthCalledWith(

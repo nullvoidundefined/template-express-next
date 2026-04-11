@@ -9,6 +9,11 @@ import { requestLogger } from 'app/middleware/requestLogger/requestLogger.js';
 import { loadSession } from 'app/middleware/requireAuth/requireAuth.js';
 import { deleteExpiredSessions } from 'app/repositories/auth/auth.js';
 import { authRouter } from 'app/routes/auth.js';
+import { shutdownPostHog } from 'app/services/posthog.js';
+import {
+  registerSentryErrorHandler,
+  setupSentry,
+} from 'app/services/sentry.js';
 import { logger } from 'app/utils/logs/logger.js';
 import cookieParser from 'cookie-parser';
 import express from 'express';
@@ -36,6 +41,8 @@ const SESSION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 validateEnv();
 
 export const app = express();
+
+setupSentry(app);
 
 app.set('trust proxy', 1);
 app.use(helmet());
@@ -77,6 +84,7 @@ app.use(loadSession);
 app.use('/auth', authRouter);
 
 app.use(notFoundHandler);
+registerSentryErrorHandler(app);
 app.use(errorHandler);
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -124,6 +132,7 @@ async function shutdown(signal: string): Promise<void> {
   clearInterval(cleanupTimer);
   await new Promise<void>((resolve) => server.close(() => resolve()));
   logger.info('HTTP server closed');
+  await shutdownPostHog();
   await pool.end();
   process.exit(0);
 }

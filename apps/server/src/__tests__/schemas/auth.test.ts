@@ -1,4 +1,10 @@
-import { loginSchema, registerSchema, userSchema } from 'app/schemas/auth.js';
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  userSchema,
+} from 'app/schemas/auth.js';
 import { describe, expect, it } from 'vitest';
 
 describe('registerSchema', () => {
@@ -6,6 +12,30 @@ describe('registerSchema', () => {
     const result = registerSchema.safeParse({
       email: 'a@b.com',
       password: '12345678',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts optional name fields', () => {
+    const result = registerSchema.safeParse({
+      email: 'user@example.com',
+      nameAlias: 'Lenny',
+      nameFirst: 'Leonard',
+      nameLast: 'Smith',
+      password: 'password123',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.nameFirst).toBe('Leonard');
+      expect(result.data.nameLast).toBe('Smith');
+      expect(result.data.nameAlias).toBe('Lenny');
+    }
+  });
+
+  it('succeeds without name fields', () => {
+    const result = registerSchema.safeParse({
+      email: 'user@example.com',
+      password: 'password123',
     });
     expect(result.success).toBe(true);
   });
@@ -68,11 +98,56 @@ describe('loginSchema', () => {
   });
 });
 
+describe('forgotPasswordSchema', () => {
+  it('accepts valid email', () => {
+    const result = forgotPasswordSchema.safeParse({ email: 'a@b.com' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects invalid email', () => {
+    const result = forgotPasswordSchema.safeParse({ email: 'bad' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects missing email', () => {
+    expect(forgotPasswordSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('resetPasswordSchema', () => {
+  it('accepts valid token and newPassword', () => {
+    const result = resetPasswordSchema.safeParse({
+      newPassword: 'password123',
+      token: 'some-token',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects short password', () => {
+    const result = resetPasswordSchema.safeParse({
+      newPassword: 'short',
+      token: 'some-token',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty token', () => {
+    const result = resetPasswordSchema.safeParse({
+      newPassword: 'password123',
+      token: '',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe('userSchema', () => {
   const validUser = {
-    id: '550e8400-e29b-41d4-a716-446655440000',
-    email: 'a@b.com',
     created_at: '2025-01-01T00:00:00.000Z',
+    email: 'a@b.com',
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    name_alias: null,
+    name_first: null,
+    name_last: null,
     updated_at: '2025-01-02T00:00:00.000Z',
   };
 
@@ -92,6 +167,21 @@ describe('userSchema', () => {
     const result = userSchema.safeParse({ ...validUser, updated_at: null });
     expect(result.success).toBe(true);
     expect(result.data!.updated_at).toBeNull();
+  });
+
+  it('accepts string values for name fields', () => {
+    const result = userSchema.safeParse({
+      ...validUser,
+      name_alias: 'Lenny',
+      name_first: 'Leonard',
+      name_last: 'Smith',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name_first).toBe('Leonard');
+      expect(result.data.name_last).toBe('Smith');
+      expect(result.data.name_alias).toBe('Lenny');
+    }
   });
 
   it('rejects invalid UUID for id', () => {

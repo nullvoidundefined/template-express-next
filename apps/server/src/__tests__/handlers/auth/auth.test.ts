@@ -11,8 +11,15 @@ import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('app/repositories/auth/auth.js');
+vi.mock('app/services/email.js', () => ({
+  sendEmail: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('app/services/posthog.js', () => ({
+  shutdownPostHog: vi.fn(),
+  trackEvent: vi.fn(),
+}));
 vi.mock('app/utils/logs/logger.js', () => ({
-  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+  logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
 const id = uuid();
@@ -27,9 +34,12 @@ app.get(
   (req, res, next) => {
     if (req.headers['x-test-user'] === '1') {
       req.user = {
-        id,
-        email: 'user@example.com',
         created_at: new Date('2025-01-01'),
+        email: 'user@example.com',
+        id,
+        name_alias: null,
+        name_first: null,
+        name_last: null,
         updated_at: null,
       };
     }
@@ -41,17 +51,23 @@ app.get(
 app.use(errorHandler);
 
 const mockUser: User & { password_hash: string } = {
-  id,
-  email: 'user@example.com',
-  password_hash: 'hashed',
   created_at: new Date('2025-01-01'),
+  email: 'user@example.com',
+  id,
+  name_alias: null,
+  name_first: null,
+  name_last: null,
+  password_hash: 'hashed',
   updated_at: null,
 };
 
 const mockAuthUser: User = {
-  id,
-  email: 'user@example.com',
   created_at: new Date('2025-01-01'),
+  email: 'user@example.com',
+  id,
+  name_alias: null,
+  name_first: null,
+  name_last: null,
   updated_at: null,
 };
 
@@ -69,8 +85,8 @@ describe('auth handlers', () => {
     it('returns 201 and sets cookie when created', async () => {
       const created = { ...mockUser };
       vi.mocked(authRepo.createUserAndSession).mockResolvedValueOnce({
-        user: created,
         sessionId: 'session-id',
+        user: created,
       });
 
       const res = await request(app)
@@ -82,12 +98,14 @@ describe('auth handlers', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         email: 'user@example.com',
         id,
+        name: { alias: null, first: null, last: null },
         updatedAt: null,
       });
       expect(res.headers['set-cookie']).toBeDefined();
       expect(authRepo.createUserAndSession).toHaveBeenCalledWith(
         'user@example.com',
         'password123',
+        { nameAlias: undefined, nameFirst: undefined, nameLast: undefined },
       );
     });
     it('returns 409 on unique violation (23505)', async () => {
@@ -144,6 +162,7 @@ describe('auth handlers', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         email: 'user@example.com',
         id,
+        name: { alias: null, first: null, last: null },
         updatedAt: null,
       });
       expect(res.headers['set-cookie']).toBeDefined();
@@ -209,6 +228,7 @@ describe('auth handlers', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
         email: 'user@example.com',
         id,
+        name: { alias: null, first: null, last: null },
         updatedAt: null,
       });
     });
