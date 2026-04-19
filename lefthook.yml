@@ -21,6 +21,15 @@ pre-commit:
           echo 'Em dash (U+2014) found in staged files. Use period, comma, colon, or en dash instead.'
           exit 1
         fi
+    migration-defaults:
+      glob: '**/migrations/**/*.{ts,js}'
+      run: |
+        pattern="default:\s*[\"'].*[\"'].*[\"']"
+        if grep -En "$pattern" {staged_files} 2>/dev/null; then
+          echo "ERROR: Migration default value appears double-quoted. Use bare strings or pgm.func()."
+          echo "See docs/recurring-bugs/migration-default-quoting.md"
+          exit 1
+        fi
 
 commit-msg:
   commands:
@@ -31,6 +40,15 @@ commit-msg:
           if ! git diff --cached --name-only | grep -qE '\.(test|spec)\.(ts|tsx|js|jsx)$'; then
             echo 'Commits with fix:/bug:/bugfix:/hotfix: subjects require at least one test file staged.'
             exit 1
+          fi
+        fi
+    refactor-scope-warning:
+      run: |
+        subject=$(head -1 {1})
+        if echo "$subject" | grep -qi "^refactor"; then
+          dirs=$(git diff --cached --name-only | xargs -I{} dirname {} | sort -u | wc -l)
+          if [ "$dirs" -gt 4 ]; then
+            echo "WARNING: refactor touches $dirs directories. Per R-213, cross-cutting refactors need a dedicated branch."
           fi
         fi
 
