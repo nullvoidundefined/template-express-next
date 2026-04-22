@@ -1,6 +1,6 @@
 import { mockResult } from 'app/__tests__/helpers/mockResult.js';
 import { uuid } from 'app/__tests__/helpers/uuids.js';
-import { query } from 'app/db/pool/pool.js';
+import { query, withTransaction } from 'app/db/pool/pool.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import crypto from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -308,5 +308,44 @@ describe('updateUser', () => {
   it('throws if no row returned', async () => {
     mockQuery.mockResolvedValueOnce(mockResult([], 0));
     await expect(authRepo.updateUser('id', { passwordHash: 'h' })).rejects.toThrow();
+  });
+});
+
+describe('consumePasswordReset', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(withTransaction).mockImplementation(
+      async (fn: (client: unknown) => Promise<unknown>) => fn(mockClient),
+    );
+  });
+
+  it('returns null when token not found', async () => {
+    mockQuery.mockResolvedValueOnce(mockResult([]));
+    const result = await authRepo.consumePasswordReset('not-a-token', 'new-hash');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when token already used', async () => {
+    const row = {
+      id: uuid(),
+      user_id: uuid(),
+      expires_at: new Date(Date.now() + 60_000),
+      used_at: new Date(),
+    };
+    mockQuery.mockResolvedValueOnce(mockResult([row]));
+    const result = await authRepo.consumePasswordReset('used-token', 'new-hash');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when token is expired', async () => {
+    const row = {
+      id: uuid(),
+      user_id: uuid(),
+      expires_at: new Date(Date.now() - 60_000),
+      used_at: null,
+    };
+    mockQuery.mockResolvedValueOnce(mockResult([row]));
+    const result = await authRepo.consumePasswordReset('expired-token', 'new-hash');
+    expect(result).toBeNull();
   });
 });

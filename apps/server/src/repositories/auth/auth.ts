@@ -176,10 +176,10 @@ export async function consumePasswordReset(
 ): Promise<User | null> {
   return withTransaction(async (client) => {
     const resetResult = await query<{
-      expires_at: Date;
       id: string;
-      used_at: Date | null;
       user_id: string;
+      expires_at: Date;
+      used_at: Date | null;
     }>(
       `SELECT id, user_id, expires_at, used_at
        FROM password_resets
@@ -190,7 +190,7 @@ export async function consumePasswordReset(
     const reset = resetResult.rows[0];
     if (!reset) return null;
     if (reset.used_at) return null;
-    if (reset.expires_at < new Date()) return null;
+    if (new Date() > reset.expires_at) return null;
 
     const userResult = await query<User>(
       `UPDATE users SET password_hash = $1
@@ -228,7 +228,7 @@ export async function updateUser(
   }
 
   if (setClauses.length === 0) {
-    throw new Error('updateUser called with no fields to update');
+    throw new Error('updateUser: at least one field must be provided');
   }
 
   values.push(userId);
