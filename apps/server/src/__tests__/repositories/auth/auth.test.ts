@@ -1,17 +1,18 @@
 import { mockResult } from 'app/__tests__/helpers/mockResult.js';
 import { uuid } from 'app/__tests__/helpers/uuids.js';
+import type { PoolClient } from 'app/db/pool/pool.js';
 import { query, withTransaction } from 'app/db/pool/pool.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import crypto from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockClient = {};
+const mockClient = {} as unknown as PoolClient;
 
 vi.mock('app/db/pool/pool.js', () => {
   const queryFn = vi.fn();
   return {
     query: queryFn,
-    withTransaction: vi.fn((fn: (client: unknown) => Promise<unknown>) =>
+    withTransaction: vi.fn((fn: (client: PoolClient) => Promise<unknown>) =>
       fn(mockClient),
     ),
   };
@@ -314,9 +315,7 @@ describe('updateUser', () => {
 describe('consumePasswordReset', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(withTransaction).mockImplementation(
-      async (fn: (client: unknown) => Promise<unknown>) => fn(mockClient),
-    );
+    vi.mocked(withTransaction).mockImplementation((fn) => fn(mockClient));
   });
 
   it('returns null when token not found', async () => {
