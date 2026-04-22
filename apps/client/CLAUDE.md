@@ -2,7 +2,7 @@
 
 Auto-loaded when working anywhere inside `apps/client/`. The root `../../CLAUDE.md` non-negotiable rules still apply; these rules layer on top for all client-side work (web, extension, mobile). Workspace-specific files layer on top of this file in turn:
 
-- `apps/client/web/CLAUDE.md` for Next.js, SCSS Modules, Radix UI, Vercel deployment
+- `apps/client/web/CLAUDE.md` for Next.js, SCSS Modules, Radix UI, Railway deployment
 - `apps/client/extension/CLAUDE.md` for WXT, browser APIs, manifest, cross-browser rules
 - `apps/client/mobile/CLAUDE.md` for Expo, React Native, EAS, mobile-specific patterns
 

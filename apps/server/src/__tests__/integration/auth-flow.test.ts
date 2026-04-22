@@ -114,7 +114,8 @@ describe.skipIf(!DB_AVAILABLE)('auth integration', () => {
         .set('X-Requested-With', 'XMLHttpRequest')
         .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
 
-      const cookie = ((registerRes.headers['set-cookie'] ?? []) as string[])[0] ?? '';
+      const cookie =
+        ((registerRes.headers['set-cookie'] ?? []) as string[])[0] ?? '';
 
       const res = await agent()
         .get('/auth/me')
@@ -133,7 +134,8 @@ describe.skipIf(!DB_AVAILABLE)('auth integration', () => {
         .set('X-Requested-With', 'XMLHttpRequest')
         .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
 
-      const cookie = ((registerRes.headers['set-cookie'] ?? []) as string[])[0] ?? '';
+      const cookie =
+        ((registerRes.headers['set-cookie'] ?? []) as string[])[0] ?? '';
 
       const logoutRes = await agent()
         .post('/auth/logout')
@@ -181,7 +183,8 @@ describe.skipIf(!DB_AVAILABLE)('auth integration', () => {
         .set('X-Requested-With', 'XMLHttpRequest')
         .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
 
-      const cookie = ((registerRes.headers['set-cookie'] ?? []) as string[])[0] ?? '';
+      const cookie =
+        ((registerRes.headers['set-cookie'] ?? []) as string[])[0] ?? '';
 
       const res = await agent()
         .patch('/auth/me')
@@ -202,7 +205,8 @@ describe.skipIf(!DB_AVAILABLE)('auth integration', () => {
         .set('X-Requested-With', 'XMLHttpRequest')
         .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
 
-      const cookie = ((registerRes.headers['set-cookie'] ?? []) as string[])[0] ?? '';
+      const cookie =
+        ((registerRes.headers['set-cookie'] ?? []) as string[])[0] ?? '';
 
       const res = await agent()
         .patch('/auth/me')

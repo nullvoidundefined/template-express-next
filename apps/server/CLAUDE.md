@@ -730,8 +730,8 @@ No exceptions, no shortcuts to facilitate a deploy.
 **CORS:**
 
 - Never use `origin: '*'` with `credentials: true`.
-- `CORS_ORIGIN` must always be set to the exact Vercel production URL in Railway.
-- Use the stable URL, never a preview hash URL.
+- `CORS_ORIGIN` must always be set to the exact Railway production URL.
+- Use the stable URL, never a preview or ephemeral URL.
 
 ---
 
@@ -761,7 +761,7 @@ Environment variables required for every service:
 | `NODE_ENV`     | `production`           | Always set. Never omit.               |
 | `PORT`         | Railway injects this   | Do not hardcode                       |
 | `DATABASE_URL` | Neon connection string | Pooled for API, direct for migrations |
-| `CORS_ORIGIN`  | Vercel production URL  | Required in production                |
+| `CORS_ORIGIN`  | Railway production URL | Required in production                |
 
 Healthcheck and zero-downtime:
 

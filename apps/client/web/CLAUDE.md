@@ -1,6 +1,6 @@
 # Web Client Conventions
 
-Auto-loaded when working in `apps/client/web/`. The root `../../../CLAUDE.md` non-negotiable rules and the shared client rules in `../CLAUDE.md` both apply; these rules layer on top for Next.js, SCSS, and Vercel-specific work. If a rule here and the parent files conflict, the parent wins and the conflict is a bug to file.
+Auto-loaded when working in `apps/client/web/`. The root `../../../CLAUDE.md` non-negotiable rules and the shared client rules in `../CLAUDE.md` both apply; these rules layer on top for Next.js, SCSS, and Railway deployment. If a rule here and the parent files conflict, the parent wins and the conflict is a bug to file.
 
 ---
 
@@ -223,7 +223,7 @@ export const api = {
 };
 ```
 
-- Base URL from `NEXT_PUBLIC_API_URL` env var (or relative URLs through a Vercel rewrite; see `apps/client/web/next.config.ts`).
+- Base URL from `NEXT_PUBLIC_API_URL` env var (or relative URLs when the frontend and API share a Railway domain).
 - `credentials: 'include'` on every request.
 - `X-Requested-With: XMLHttpRequest` header for CSRF (header-only pattern; no token endpoint).
 - Errors throw with the server's error message.
@@ -642,20 +642,12 @@ These layer on top of the root non-negotiables in `../../../CLAUDE.md`. If they 
 
 ---
 
-## Vercel Deployment
+## Railway Deployment (Web Service)
 
-**Root directory must be set to `apps/client/web/`.** Vercel checks for `next` in the root `package.json` before running install, but in this monorepo the Next.js dependency lives in `apps/client/web/package.json`. Without setting the root directory, builds will fail with "No Next.js version detected."
+The Next.js frontend deploys as a `web` Railway service within the same project as the API, Postgres, and Redis services.
 
-The fix is either:
-
-1. Set "Root Directory" to `apps/client/web` in the Vercel dashboard project settings.
-2. Use `vercel --cwd apps/client/web` from the command line.
-
-```bash
-cd apps/client/web
-vercel deploy --prod --yes
-```
-
-- Always deploy from the `apps/client/web/` directory, never the repo root.
-- The `.vercel/` link lives in that directory.
-- Set `NEXT_PUBLIC_API_URL` in Vercel env vars pointing to the Railway API service, or use same-origin rewrites via `next.config.ts` (the preferred pattern for Safari ITP compatibility).
+- Set the root directory to `apps/client/web/` in the Railway service settings.
+- Set `NODE_ENV=production` on the web service.
+- Set all env vars on the web service before the first deploy.
+- When the frontend and API share a Railway domain, cookies use `SameSite: 'lax'`. No same-origin rewrite required.
+- Railway's default Next.js health check applies; no custom `/health` route needed on the web service.
