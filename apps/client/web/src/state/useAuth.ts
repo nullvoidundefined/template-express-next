@@ -8,7 +8,6 @@ import { z } from 'zod';
 export type { User };
 
 // Runtime schema mirrors the User type from @repo/types.
-// Keeps the TypeScript type (compile-time) and Zod schema (runtime) in sync.
 const userSchema = z.object({
   createdAt: z.string(),
   email: z.string(),
@@ -19,6 +18,9 @@ const userSchema = z.object({
 const authResponseSchema = z.object({ user: userSchema });
 
 type Credentials = { email: string; password: string };
+type ForgotPasswordInput = { email: string };
+type ResetPasswordInput = { password: string; token: string };
+type UpdateMeInput = { currentPassword?: string; newPassword?: string };
 
 const AUTH_KEY = ['auth', 'me'] as const;
 
@@ -56,13 +58,37 @@ function useAuth() {
     onSuccess: (data) => queryClient.setQueryData(AUTH_KEY, data),
   });
 
+  const forgotPasswordMutation = useMutation({
+    mutationFn: ({ email }: ForgotPasswordInput) =>
+      api('/auth/forgot-password', { body: { email }, method: 'POST' }),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ password, token }: ResetPasswordInput) =>
+      api('/auth/reset-password', { body: { password, token }, method: 'POST' }),
+  });
+
+  const updateMeMutation = useMutation({
+    mutationFn: ({ currentPassword, newPassword }: UpdateMeInput) =>
+      api('/auth/me', authResponseSchema, {
+        body: { currentPassword, newPassword },
+        method: 'PATCH',
+      }).then((d) => d.user),
+    onSuccess: (data) => queryClient.setQueryData(AUTH_KEY, data),
+  });
+
   return {
+    forgotPassword: (email: string) =>
+      forgotPasswordMutation.mutateAsync({ email }),
     isLoading,
     login: (email: string, password: string) =>
       loginMutation.mutateAsync({ email, password }),
     logout: () => logoutMutation.mutateAsync(),
     register: (email: string, password: string) =>
       registerMutation.mutateAsync({ email, password }),
+    resetPassword: (token: string, password: string) =>
+      resetPasswordMutation.mutateAsync({ password, token }),
+    updateMe: (input: UpdateMeInput) => updateMeMutation.mutateAsync(input),
     user,
   };
 }
