@@ -2,9 +2,10 @@
 
 import { type FormEvent, useCallback, useState } from 'react';
 
+import { useRouter, useSearchParams } from 'next/navigation';
+
 import { useAuth } from '@/state/useAuth';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 import styles from '../auth.module.scss';
 
@@ -15,6 +16,9 @@ function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState('');
+
+  const searchParams = useSearchParams();
+  const resetSuccess = searchParams.get('reset') === 'true';
 
   const handleSubmit = useCallback(
     async (e: FormEvent) => {
@@ -37,7 +41,12 @@ function LoginPage() {
     <main className={styles.page} data-test-id='login-page'>
       <div className={styles.card}>
         <h1 className={styles.title}>Log in</h1>
-        <form className={styles.form} onSubmit={handleSubmit} noValidate>
+        {resetSuccess && (
+          <p className={styles.hint} role='status' style={{ marginBottom: 16, color: 'green' }}>
+            Password reset successfully. Please log in.
+          </p>
+        )}
+        <form className={styles.form} data-test-id='login-form' noValidate onSubmit={handleSubmit}>
           <div className={styles.field}>
             <label className={styles.label} htmlFor='email'>
               Email
@@ -77,6 +86,10 @@ function LoginPage() {
           Don&apos;t have an account?{' '}
           <Link className={styles.link} href='/register'>
             Register
+          </Link>
+          {' · '}
+          <Link className={styles.link} href='/forgot-password'>
+            Forgot password?
           </Link>
         </p>
       </div>
