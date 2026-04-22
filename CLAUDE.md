@@ -125,10 +125,10 @@ Before launching agents or making changes across repos:
 
 ### Model Selection for Agents
 
-| Task Type | Recommended Model | Examples |
-|-----------|------------------|----------|
-| Mechanical / repetitive | Sonnet or Haiku | Copy a pattern, add a CI config file, rename imports, apply a known fix |
-| Deep reasoning | Opus | Architecture decisions, complex refactoring, debugging, designing new abstractions |
+| Task Type               | Recommended Model | Examples                                                                           |
+| ----------------------- | ----------------- | ---------------------------------------------------------------------------------- |
+| Mechanical / repetitive | Sonnet or Haiku   | Copy a pattern, add a CI config file, rename imports, apply a known fix            |
+| Deep reasoning          | Opus              | Architecture decisions, complex refactoring, debugging, designing new abstractions |
 
 Default to the cheaper model. Reserve Opus for tasks where the agent needs judgment calls, complex interactions, or non-obvious failure debugging.
 
@@ -444,7 +444,9 @@ Wraps all auth operations in TanStack Query mutations. Query key: `['auth', 'me'
 import type { User } from '@repo/types';
 declare global {
   namespace Express {
-    interface Request { user?: User; }
+    interface Request {
+      user?: User;
+    }
   }
 }
 ```
