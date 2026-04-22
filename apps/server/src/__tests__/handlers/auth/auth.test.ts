@@ -28,6 +28,22 @@ app.post('/login', authHandlers.login);
 app.post('/logout', authHandlers.logout);
 app.post('/forgot-password', authHandlers.forgotPassword);
 app.post('/reset-password', authHandlers.resetPassword);
+app.patch(
+  '/me',
+  (req, res, next) => {
+    if (req.headers['x-test-user'] === '1') {
+      req.user = {
+        id,
+        email: 'user@example.com',
+        created_at: new Date('2025-01-01'),
+        updated_at: null,
+      };
+    }
+    next();
+  },
+  requireAuth,
+  authHandlers.updateMe,
+);
 app.get(
   '/me',
   (req, res, next) => {
@@ -243,6 +259,45 @@ describe('auth handlers', () => {
         .send({ token: 'valid-token', password: 'newpassword123' });
 
       expect(res.status).toBe(204);
+    });
+  });
+
+  describe('updateMe', () => {
+    it('returns 401 when not authenticated', async () => {
+      const res = await request(app).patch('/me').send({ name: 'Alice' });
+      expect(res.status).toBe(401);
+    });
+    it('returns 400 when body fails schema refine (newPassword without currentPassword)', async () => {
+      const res = await request(app)
+        .patch('/me')
+        .set('x-test-user', '1')
+        .send({ newPassword: 'newpass123' });
+      expect(res.status).toBe(400);
+    });
+    it('returns 400 when currentPassword is wrong', async () => {
+      vi.mocked(authRepo.findUserByEmail).mockResolvedValueOnce(mockUser);
+      vi.mocked(authRepo.verifyPassword).mockResolvedValueOnce(false);
+
+      const res = await request(app)
+        .patch('/me')
+        .set('x-test-user', '1')
+        .send({ currentPassword: 'wrong', newPassword: 'newpass123' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toBe('Current password is incorrect');
+    });
+    it('returns 200 with updated user when password changed successfully', async () => {
+      vi.mocked(authRepo.findUserByEmail).mockResolvedValueOnce(mockUser);
+      vi.mocked(authRepo.verifyPassword).mockResolvedValueOnce(true);
+      vi.mocked(authRepo.updateUser).mockResolvedValueOnce(mockAuthUser);
+
+      const res = await request(app)
+        .patch('/me')
+        .set('x-test-user', '1')
+        .send({ currentPassword: 'correct', newPassword: 'newpass123' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.user).toBeDefined();
     });
   });
 

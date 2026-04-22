@@ -5,7 +5,7 @@ import { isProduction } from 'app/config/env.js';
 import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from 'app/constants/session.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import type { User } from 'app/schemas/auth.js';
-import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from 'app/schemas/auth.js';
+import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema, updateMeSchema } from 'app/schemas/auth.js';
 import * as emailService from 'app/services/email/email.js';
 import { logger } from 'app/utils/logs/logger.js';
 
@@ -166,4 +166,45 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
 
   logger.info({ event: 'password_reset_success', userId: user.id }, 'Password reset successfully');
   res.status(204).send();
+}
+
+export async function updateMe(req: Request, res: Response): Promise<void> {
+  const parsed = updateMeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const message = parsed.error.issues.map((e) => e.message).join('; ');
+    res.status(400).json({ error: { message } });
+    return;
+  }
+
+  const { currentPassword, newPassword } = parsed.data;
+  const userId = req.user!.id;
+
+  if (newPassword) {
+    // currentPassword is guaranteed by schema refine, but guard defensively
+    if (!currentPassword) {
+      res.status(400).json({ error: { message: 'currentPassword is required when setting a new password' } });
+      return;
+    }
+
+    const userWithHash = await authRepo.findUserByEmail(req.user!.email);
+    if (!userWithHash) {
+      res.status(400).json({ error: { message: 'User not found' } });
+      return;
+    }
+
+    const valid = await authRepo.verifyPassword(currentPassword, userWithHash.password_hash);
+    if (!valid) {
+      res.status(400).json({ error: { message: 'Current password is incorrect' } });
+      return;
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    const updated = await authRepo.updateUser(userId, { passwordHash: newPasswordHash });
+    logger.info({ event: 'password_changed', userId }, 'User changed password');
+    res.json({ user: toUserResponse(updated) });
+    return;
+  }
+
+  // No changes requested
+  res.json({ user: toUserResponse(req.user!) });
 }
