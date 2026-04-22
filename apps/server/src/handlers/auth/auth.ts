@@ -5,7 +5,7 @@ import { isProduction } from 'app/config/env.js';
 import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from 'app/constants/session.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import type { User } from 'app/schemas/auth.js';
-import { forgotPasswordSchema, loginSchema, registerSchema } from 'app/schemas/auth.js';
+import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from 'app/schemas/auth.js';
 import * as emailService from 'app/services/email/email.js';
 import { logger } from 'app/utils/logs/logger.js';
 
@@ -144,4 +144,26 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
       logger.error({ err, event: 'password_reset_email_error' }, 'Error sending password reset email');
     }
   })();
+}
+
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const message = parsed.error.issues.map((e) => e.message).join('; ');
+    res.status(400).json({ error: { message } });
+    return;
+  }
+
+  const { token, password } = parsed.data;
+  const tokenHash = crypto.createHash('sha256').update(token, 'utf8').digest('hex');
+  const newPasswordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+  const user = await authRepo.consumePasswordReset(tokenHash, newPasswordHash);
+  if (!user) {
+    res.status(400).json({ error: { message: 'Invalid or expired token' } });
+    return;
+  }
+
+  logger.info({ event: 'password_reset_success', userId: user.id }, 'Password reset successfully');
+  res.status(204).send();
 }

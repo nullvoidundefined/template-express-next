@@ -27,6 +27,7 @@ app.post('/register', authHandlers.register);
 app.post('/login', authHandlers.login);
 app.post('/logout', authHandlers.logout);
 app.post('/forgot-password', authHandlers.forgotPassword);
+app.post('/reset-password', authHandlers.resetPassword);
 app.get(
   '/me',
   (req, res, next) => {
@@ -216,6 +217,32 @@ describe('auth handlers', () => {
         id,
         updatedAt: null,
       });
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('returns 400 when body invalid', async () => {
+      const res = await request(app).post('/reset-password').send({});
+      expect(res.status).toBe(400);
+    });
+    it('returns 400 when token invalid or expired', async () => {
+      vi.mocked(authRepo.consumePasswordReset).mockResolvedValueOnce(null);
+
+      const res = await request(app)
+        .post('/reset-password')
+        .send({ token: 'bad-token', password: 'newpassword123' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toBe('Invalid or expired token');
+    });
+    it('returns 204 on success', async () => {
+      vi.mocked(authRepo.consumePasswordReset).mockResolvedValueOnce(mockAuthUser);
+
+      const res = await request(app)
+        .post('/reset-password')
+        .send({ token: 'valid-token', password: 'newpassword123' });
+
+      expect(res.status).toBe(204);
     });
   });
 
