@@ -88,7 +88,7 @@ export default tseslint.config([
         { fixStyle: 'inline-type-imports', prefer: 'type-imports' },
       ],
       '@typescript-eslint/no-empty-object-type': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-misused-promises': [
         'warn',

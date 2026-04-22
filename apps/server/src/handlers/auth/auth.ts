@@ -1,6 +1,6 @@
 import { isProduction } from 'app/config/env.js';
-import { clearSession } from 'app/middleware/requireAuth/requireAuth.js';
 import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from 'app/constants/session.js';
+import { clearSession } from 'app/middleware/requireAuth/requireAuth.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import type { User } from 'app/schemas/auth.js';
 import {
