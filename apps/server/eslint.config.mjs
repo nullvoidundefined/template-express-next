@@ -7,7 +7,14 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config([
   {
-    ignores: ['dist', 'build', 'node_modules', '**/*.d.ts', 'vitest.config.ts'],
+    ignores: [
+      'dist',
+      'build',
+      'node_modules',
+      '**/*.d.ts',
+      'vitest.config.ts',
+      'vitest.integration.config.ts',
+    ],
   },
   {
     linterOptions: {
