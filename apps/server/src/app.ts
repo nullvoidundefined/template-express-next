@@ -27,6 +27,18 @@ function validateEnv(): void {
     console.error('Fatal: CORS_ORIGIN is required in production');
     process.exit(1);
   }
+  if (isProduction() && !process.env.CLIENT_URL) {
+    console.error('Fatal: CLIENT_URL is required in production');
+    process.exit(1);
+  }
+  if (isProduction() && !process.env.RESEND_API_KEY) {
+    console.error('Fatal: RESEND_API_KEY is required in production');
+    process.exit(1);
+  }
+  if (isProduction() && !process.env.RESEND_FROM_EMAIL) {
+    console.error('Fatal: RESEND_FROM_EMAIL is required in production');
+    process.exit(1);
+  }
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
