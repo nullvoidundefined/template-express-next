@@ -295,20 +295,29 @@ describe('updateUser', () => {
   });
 
   it('updates passwordHash and returns updated user', async () => {
-    const updated: { id: string; email: string; created_at: Date; updated_at: Date } = {
+    const updated: {
+      id: string;
+      email: string;
+      created_at: Date;
+      updated_at: Date;
+    } = {
       id: uuid(),
       email: 'a@b.com',
       created_at: new Date(),
       updated_at: new Date(),
     };
     mockQuery.mockResolvedValueOnce(mockResult([updated]));
-    const result = await authRepo.updateUser(updated.id, { passwordHash: 'new-hash' });
+    const result = await authRepo.updateUser(updated.id, {
+      passwordHash: 'new-hash',
+    });
     expect(result).toEqual(updated);
   });
 
   it('throws if no row returned', async () => {
     mockQuery.mockResolvedValueOnce(mockResult([], 0));
-    await expect(authRepo.updateUser('id', { passwordHash: 'h' })).rejects.toThrow();
+    await expect(
+      authRepo.updateUser('id', { passwordHash: 'h' }),
+    ).rejects.toThrow();
   });
 });
 
@@ -320,7 +329,10 @@ describe('consumePasswordReset', () => {
 
   it('returns null when token not found', async () => {
     mockQuery.mockResolvedValueOnce(mockResult([]));
-    const result = await authRepo.consumePasswordReset('not-a-token', 'new-hash');
+    const result = await authRepo.consumePasswordReset(
+      'not-a-token',
+      'new-hash',
+    );
     expect(result).toBeNull();
   });
 
@@ -332,7 +344,10 @@ describe('consumePasswordReset', () => {
       used_at: new Date(),
     };
     mockQuery.mockResolvedValueOnce(mockResult([row]));
-    const result = await authRepo.consumePasswordReset('used-token', 'new-hash');
+    const result = await authRepo.consumePasswordReset(
+      'used-token',
+      'new-hash',
+    );
     expect(result).toBeNull();
   });
 
@@ -344,7 +359,10 @@ describe('consumePasswordReset', () => {
       used_at: null,
     };
     mockQuery.mockResolvedValueOnce(mockResult([row]));
-    const result = await authRepo.consumePasswordReset('expired-token', 'new-hash');
+    const result = await authRepo.consumePasswordReset(
+      'expired-token',
+      'new-hash',
+    );
     expect(result).toBeNull();
   });
 });

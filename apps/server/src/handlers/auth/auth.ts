@@ -1,13 +1,19 @@
-import crypto from 'node:crypto';
-import bcrypt from 'bcrypt';
-import type { Request, Response } from 'express';
 import { isProduction } from 'app/config/env.js';
 import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from 'app/constants/session.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import type { User } from 'app/schemas/auth.js';
-import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema, updateMeSchema } from 'app/schemas/auth.js';
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  updateMeSchema,
+} from 'app/schemas/auth.js';
 import * as emailService from 'app/services/email/email.js';
 import { logger } from 'app/utils/logs/logger.js';
+import bcrypt from 'bcrypt';
+import type { Request, Response } from 'express';
+import crypto from 'node:crypto';
 
 const SALT_ROUNDS = 12;
 
@@ -111,7 +117,10 @@ export async function me(req: Request, res: Response): Promise<void> {
   res.json({ user: toUserResponse(req.user!) });
 }
 
-export async function forgotPassword(req: Request, res: Response): Promise<void> {
+export async function forgotPassword(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const parsed = forgotPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     const message = parsed.error.issues.map((e) => e.message).join('; ');
@@ -122,7 +131,10 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
   const { email } = parsed.data;
 
   // Always return 200 regardless of whether the email exists (prevents user enumeration).
-  res.status(200).json({ message: 'If that email is registered, you will receive a reset link shortly.' });
+  res.status(200).json({
+    message:
+      'If that email is registered, you will receive a reset link shortly.',
+  });
 
   // Fire-and-forget after responding so latency is not exposed to the caller.
   void (async () => {
@@ -131,7 +143,10 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
       if (!user) return;
 
       const rawToken = crypto.randomBytes(32).toString('hex');
-      const tokenHash = crypto.createHash('sha256').update(rawToken, 'utf8').digest('hex');
+      const tokenHash = crypto
+        .createHash('sha256')
+        .update(rawToken, 'utf8')
+        .digest('hex');
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
       await authRepo.createPasswordReset(user.id, tokenHash, expiresAt);
@@ -139,14 +154,23 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
       const resetUrl = `${process.env.CLIENT_URL ?? 'http://localhost:3000'}/reset-password?token=${rawToken}`;
       await emailService.sendPasswordResetEmail(email, resetUrl);
 
-      logger.info({ event: 'password_reset_email_sent', userId: user.id }, 'Password reset email dispatched');
+      logger.info(
+        { event: 'password_reset_email_sent', userId: user.id },
+        'Password reset email dispatched',
+      );
     } catch (err) {
-      logger.error({ err, event: 'password_reset_email_error' }, 'Error sending password reset email');
+      logger.error(
+        { err, event: 'password_reset_email_error' },
+        'Error sending password reset email',
+      );
     }
   })();
 }
 
-export async function resetPassword(req: Request, res: Response): Promise<void> {
+export async function resetPassword(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const parsed = resetPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     const message = parsed.error.issues.map((e) => e.message).join('; ');
@@ -155,7 +179,10 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
   }
 
   const { token, password } = parsed.data;
-  const tokenHash = crypto.createHash('sha256').update(token, 'utf8').digest('hex');
+  const tokenHash = crypto
+    .createHash('sha256')
+    .update(token, 'utf8')
+    .digest('hex');
   const newPasswordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
   const user = await authRepo.consumePasswordReset(tokenHash, newPasswordHash);
@@ -164,7 +191,10 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
     return;
   }
 
-  logger.info({ event: 'password_reset_success', userId: user.id }, 'Password reset successfully');
+  logger.info(
+    { event: 'password_reset_success', userId: user.id },
+    'Password reset successfully',
+  );
   res.status(204).send();
 }
 
@@ -182,7 +212,11 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
   if (newPassword) {
     // currentPassword is guaranteed by schema refine, but guard defensively
     if (!currentPassword) {
-      res.status(400).json({ error: { message: 'currentPassword is required when setting a new password' } });
+      res.status(400).json({
+        error: {
+          message: 'currentPassword is required when setting a new password',
+        },
+      });
       return;
     }
 
@@ -192,14 +226,21 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const valid = await authRepo.verifyPassword(currentPassword, userWithHash.password_hash);
+    const valid = await authRepo.verifyPassword(
+      currentPassword,
+      userWithHash.password_hash,
+    );
     if (!valid) {
-      res.status(400).json({ error: { message: 'Current password is incorrect' } });
+      res
+        .status(400)
+        .json({ error: { message: 'Current password is incorrect' } });
       return;
     }
 
     const newPasswordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    const updated = await authRepo.updateUser(userId, { passwordHash: newPasswordHash });
+    const updated = await authRepo.updateUser(userId, {
+      passwordHash: newPasswordHash,
+    });
     logger.info({ event: 'password_changed', userId }, 'User changed password');
     res.json({ user: toUserResponse(updated) });
     return;

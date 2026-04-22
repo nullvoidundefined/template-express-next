@@ -207,7 +207,11 @@ export async function consumePasswordReset(
       [reset.id],
       client,
     );
-    await query('DELETE FROM sessions WHERE user_id = $1', [reset.user_id], client);
+    await query(
+      'DELETE FROM sessions WHERE user_id = $1',
+      [reset.user_id],
+      client,
+    );
 
     return user;
   });

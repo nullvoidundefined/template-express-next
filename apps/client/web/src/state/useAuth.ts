@@ -1,10 +1,9 @@
 'use client';
 
+import { api } from '@/services/api';
 import type { User } from '@repo/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-
-import { api } from '@/services/api';
 
 export type { User };
 
@@ -66,7 +65,10 @@ function useAuth() {
 
   const resetPasswordMutation = useMutation({
     mutationFn: ({ password, token }: ResetPasswordInput) =>
-      api('/auth/reset-password', { body: { password, token }, method: 'POST' }),
+      api('/auth/reset-password', {
+        body: { password, token },
+        method: 'POST',
+      }),
   });
 
   const updateMeMutation = useMutation({

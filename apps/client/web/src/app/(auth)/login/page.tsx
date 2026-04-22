@@ -2,10 +2,9 @@
 
 import { type FormEvent, useCallback, useState } from 'react';
 
+import { useAuth } from '@/state/useAuth';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-
-import { useAuth } from '@/state/useAuth';
 
 import styles from '../auth.module.scss';
 
@@ -42,11 +41,20 @@ function LoginPage() {
       <div className={styles.card}>
         <h1 className={styles.title}>Log in</h1>
         {resetSuccess && (
-          <p className={styles.hint} role='status' style={{ marginBottom: 16, color: 'green' }}>
+          <p
+            className={styles.hint}
+            role='status'
+            style={{ marginBottom: 16, color: 'green' }}
+          >
             Password reset successfully. Please log in.
           </p>
         )}
-        <form className={styles.form} data-test-id='login-form' noValidate onSubmit={handleSubmit}>
+        <form
+          className={styles.form}
+          data-test-id='login-form'
+          noValidate
+          onSubmit={handleSubmit}
+        >
           <div className={styles.field}>
             <label className={styles.label} htmlFor='email'>
               Email

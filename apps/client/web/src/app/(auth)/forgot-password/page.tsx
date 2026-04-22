@@ -2,9 +2,8 @@
 
 import { type FormEvent, useCallback, useState } from 'react';
 
-import Link from 'next/link';
-
 import { api } from '@/services/api';
+import Link from 'next/link';
 
 import styles from '../auth.module.scss';
 

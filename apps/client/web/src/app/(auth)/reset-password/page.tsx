@@ -2,10 +2,9 @@
 
 import { type FormEvent, useCallback, useState } from 'react';
 
+import { api } from '@/services/api';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-
-import { api } from '@/services/api';
 
 import styles from '../auth.module.scss';
 
@@ -43,7 +42,9 @@ function ResetPasswordPage() {
         router.push('/login?reset=true');
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : 'This link is invalid or has expired',
+          err instanceof Error
+            ? err.message
+            : 'This link is invalid or has expired',
         );
       } finally {
         setLoading(false);
@@ -94,7 +95,11 @@ function ResetPasswordPage() {
               {error}
             </p>
           )}
-          <button className={styles.submit} disabled={loading || !token} type='submit'>
+          <button
+            className={styles.submit}
+            disabled={loading || !token}
+            type='submit'
+          >
             {loading ? 'Resetting...' : 'Reset password'}
           </button>
         </form>

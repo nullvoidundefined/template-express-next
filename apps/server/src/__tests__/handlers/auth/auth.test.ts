@@ -10,7 +10,15 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import http from 'node:http';
 import request from 'supertest';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 vi.mock('app/repositories/auth/auth.js');
 vi.mock('app/services/email/email.js', () => ({
@@ -272,7 +280,9 @@ describe('auth handlers', () => {
       expect(res.body.error.message).toBe('Invalid or expired token');
     });
     it('returns 204 on success', async () => {
-      vi.mocked(authRepo.consumePasswordReset).mockResolvedValueOnce(mockAuthUser);
+      vi.mocked(authRepo.consumePasswordReset).mockResolvedValueOnce(
+        mockAuthUser,
+      );
 
       const res = await request(server)
         .post('/reset-password')
@@ -329,14 +339,18 @@ describe('auth handlers', () => {
     it('returns 200 and sends email when user found', async () => {
       vi.mocked(authRepo.findUserByEmail).mockResolvedValueOnce(mockUser);
       vi.mocked(authRepo.createPasswordReset).mockResolvedValueOnce(undefined);
-      vi.mocked(emailService.sendPasswordResetEmail).mockResolvedValueOnce(undefined);
+      vi.mocked(emailService.sendPasswordResetEmail).mockResolvedValueOnce(
+        undefined,
+      );
 
       const res = await request(server)
         .post('/forgot-password')
         .send({ email: 'user@example.com' });
 
       expect(res.status).toBe(200);
-      await vi.waitFor(() => expect(emailService.sendPasswordResetEmail).toHaveBeenCalledOnce());
+      await vi.waitFor(() =>
+        expect(emailService.sendPasswordResetEmail).toHaveBeenCalledOnce(),
+      );
     });
     it('returns 200 and does NOT send email when user not found', async () => {
       vi.mocked(authRepo.findUserByEmail).mockResolvedValueOnce(null);
@@ -346,7 +360,9 @@ describe('auth handlers', () => {
         .send({ email: 'nobody@example.com' });
 
       expect(res.status).toBe(200);
-      await vi.waitFor(() => expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled());
+      await vi.waitFor(() =>
+        expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled(),
+      );
     });
   });
 });

@@ -5,7 +5,11 @@ import express from 'express';
 
 const authRouter = express.Router();
 
-authRouter.post('/forgot-password', authRateLimiter, authHandlers.forgotPassword);
+authRouter.post(
+  '/forgot-password',
+  authRateLimiter,
+  authHandlers.forgotPassword,
+);
 authRouter.post('/login', authRateLimiter, authHandlers.login);
 authRouter.post('/logout', authHandlers.logout);
 authRouter.get('/me', requireAuth, authHandlers.me);
