@@ -8,8 +8,9 @@ import type { User } from 'app/schemas/auth.js';
 import * as emailService from 'app/services/email/email.js';
 import cookieParser from 'cookie-parser';
 import express from 'express';
+import http from 'node:http';
 import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('app/repositories/auth/auth.js');
 vi.mock('app/services/email/email.js', () => ({
@@ -62,6 +63,25 @@ app.get(
 );
 app.use(errorHandler);
 
+// Supertest v7 requires a listening http.Server because serverAddress() calls
+// server.address() which returns null on an Express function (not an http.Server).
+let server: http.Server;
+beforeAll(
+  () =>
+    new Promise<void>((resolve, reject) => {
+      server = http.createServer(app);
+      server.listen(0);
+      server.once('listening', resolve);
+      server.once('error', reject);
+    }),
+);
+afterAll(
+  () =>
+    new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    }),
+);
+
 const mockUser: User & { password_hash: string } = {
   id,
   email: 'user@example.com',
@@ -84,7 +104,7 @@ describe('auth handlers', () => {
 
   describe('register', () => {
     it('returns 400 when body invalid', async () => {
-      const res = await request(app).post('/register').send({});
+      const res = await request(server).post('/register').send({});
       expect(res.status).toBe(400);
       expect(authRepo.createUserAndSession).not.toHaveBeenCalled();
     });
@@ -95,7 +115,7 @@ describe('auth handlers', () => {
         sessionId: 'session-id',
       });
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/register')
         .send({ email: 'user@example.com', password: 'password123' });
 
@@ -116,7 +136,7 @@ describe('auth handlers', () => {
       const err = Object.assign(new Error('duplicate key'), { code: '23505' });
       vi.mocked(authRepo.createUserAndSession).mockRejectedValueOnce(err);
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/register')
         .send({ email: 'user@example.com', password: 'password123' });
 
@@ -128,7 +148,7 @@ describe('auth handlers', () => {
         new Error('DB error'),
       );
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/register')
         .send({ email: 'user@example.com', password: 'password123' });
 
@@ -139,14 +159,14 @@ describe('auth handlers', () => {
 
   describe('login', () => {
     it('returns 400 when body invalid', async () => {
-      const res = await request(app).post('/login').send({});
+      const res = await request(server).post('/login').send({});
       expect(res.status).toBe(400);
       expect(authRepo.authenticate).not.toHaveBeenCalled();
     });
     it('returns 401 when credentials invalid', async () => {
       vi.mocked(authRepo.authenticate).mockResolvedValueOnce(null);
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/login')
         .send({ email: 'nobody@example.com', password: 'wrong' });
 
@@ -157,7 +177,7 @@ describe('auth handlers', () => {
       vi.mocked(authRepo.authenticate).mockResolvedValueOnce(mockAuthUser);
       vi.mocked(authRepo.loginUser).mockResolvedValueOnce('session-id');
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/login')
         .send({ email: 'user@example.com', password: 'password123' });
 
@@ -180,7 +200,7 @@ describe('auth handlers', () => {
         new Error('DB error'),
       );
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/login')
         .send({ email: 'user@example.com', password: 'password123' });
 
@@ -191,14 +211,14 @@ describe('auth handlers', () => {
 
   describe('logout', () => {
     it('returns 204 and clears cookie with no cookie', async () => {
-      const res = await request(app).post('/logout');
+      const res = await request(server).post('/logout');
       expect(res.status).toBe(204);
       expect(authRepo.deleteSession).not.toHaveBeenCalled();
     });
     it('returns 204 and deletes session when cookie present', async () => {
       vi.mocked(authRepo.deleteSession).mockResolvedValueOnce(true);
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/logout')
         .set('Cookie', `${SESSION_COOKIE_NAME}=abc123`);
 
@@ -210,7 +230,7 @@ describe('auth handlers', () => {
         new Error('DB error'),
       );
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/logout')
         .set('Cookie', `${SESSION_COOKIE_NAME}=abc123`);
 
@@ -220,12 +240,12 @@ describe('auth handlers', () => {
 
   describe('me', () => {
     it('returns 401 when not authenticated', async () => {
-      const res = await request(app).get('/me');
+      const res = await request(server).get('/me');
       expect(res.status).toBe(401);
       expect(res.body.error.message).toBe('Authentication required');
     });
     it('returns 200 with user when req.user set', async () => {
-      const res = await request(app).get('/me').set('x-test-user', '1');
+      const res = await request(server).get('/me').set('x-test-user', '1');
       expect(res.status).toBe(200);
       expect(res.body.user).toEqual({
         createdAt: '2025-01-01T00:00:00.000Z',
@@ -238,13 +258,13 @@ describe('auth handlers', () => {
 
   describe('resetPassword', () => {
     it('returns 400 when body invalid', async () => {
-      const res = await request(app).post('/reset-password').send({});
+      const res = await request(server).post('/reset-password').send({});
       expect(res.status).toBe(400);
     });
     it('returns 400 when token invalid or expired', async () => {
       vi.mocked(authRepo.consumePasswordReset).mockResolvedValueOnce(null);
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/reset-password')
         .send({ token: 'bad-token', password: 'newpassword123' });
 
@@ -254,7 +274,7 @@ describe('auth handlers', () => {
     it('returns 204 on success', async () => {
       vi.mocked(authRepo.consumePasswordReset).mockResolvedValueOnce(mockAuthUser);
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/reset-password')
         .send({ token: 'valid-token', password: 'newpassword123' });
 
@@ -264,11 +284,11 @@ describe('auth handlers', () => {
 
   describe('updateMe', () => {
     it('returns 401 when not authenticated', async () => {
-      const res = await request(app).patch('/me').send({ name: 'Alice' });
+      const res = await request(server).patch('/me').send({ name: 'Alice' });
       expect(res.status).toBe(401);
     });
     it('returns 400 when body fails schema refine (newPassword without currentPassword)', async () => {
-      const res = await request(app)
+      const res = await request(server)
         .patch('/me')
         .set('x-test-user', '1')
         .send({ newPassword: 'newpass123' });
@@ -278,7 +298,7 @@ describe('auth handlers', () => {
       vi.mocked(authRepo.findUserByEmail).mockResolvedValueOnce(mockUser);
       vi.mocked(authRepo.verifyPassword).mockResolvedValueOnce(false);
 
-      const res = await request(app)
+      const res = await request(server)
         .patch('/me')
         .set('x-test-user', '1')
         .send({ currentPassword: 'wrong', newPassword: 'newpass123' });
@@ -291,7 +311,7 @@ describe('auth handlers', () => {
       vi.mocked(authRepo.verifyPassword).mockResolvedValueOnce(true);
       vi.mocked(authRepo.updateUser).mockResolvedValueOnce(mockAuthUser);
 
-      const res = await request(app)
+      const res = await request(server)
         .patch('/me')
         .set('x-test-user', '1')
         .send({ currentPassword: 'correct', newPassword: 'newpass123' });
@@ -303,7 +323,7 @@ describe('auth handlers', () => {
 
   describe('forgotPassword', () => {
     it('returns 400 when body invalid', async () => {
-      const res = await request(app).post('/forgot-password').send({});
+      const res = await request(server).post('/forgot-password').send({});
       expect(res.status).toBe(400);
     });
     it('returns 200 and sends email when user found', async () => {
@@ -311,7 +331,7 @@ describe('auth handlers', () => {
       vi.mocked(authRepo.createPasswordReset).mockResolvedValueOnce(undefined);
       vi.mocked(emailService.sendPasswordResetEmail).mockResolvedValueOnce(undefined);
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/forgot-password')
         .send({ email: 'user@example.com' });
 
@@ -321,7 +341,7 @@ describe('auth handlers', () => {
     it('returns 200 and does NOT send email when user not found', async () => {
       vi.mocked(authRepo.findUserByEmail).mockResolvedValueOnce(null);
 
-      const res = await request(app)
+      const res = await request(server)
         .post('/forgot-password')
         .send({ email: 'nobody@example.com' });
 
