@@ -1,6 +1,6 @@
+import { Resend } from 'resend';
 import { env } from 'app/config/env.js';
 import { logger } from 'app/utils/logs/logger.js';
-import { Resend } from 'resend';
 
 let resendClient: Resend | null = null;
 
