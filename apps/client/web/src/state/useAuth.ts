@@ -1,9 +1,10 @@
 'use client';
 
-import { api } from '@/services/api';
 import type { User } from '@repo/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
+
+import { api } from '@/services/api';
 
 export type { User };
 

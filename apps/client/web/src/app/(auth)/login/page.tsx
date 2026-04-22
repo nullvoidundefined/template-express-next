@@ -2,10 +2,10 @@
 
 import { type FormEvent, useCallback, useState } from 'react';
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { useAuth } from '@/state/useAuth';
-import Link from 'next/link';
 
 import styles from '../auth.module.scss';
 

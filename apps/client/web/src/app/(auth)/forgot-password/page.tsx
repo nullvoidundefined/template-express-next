@@ -39,7 +39,7 @@ function ForgotPasswordPage() {
           <p className={styles.hint}>
             If that email is registered, you will receive a reset link shortly.
           </p>
-          <p className={styles.footer} style={{ marginTop: 24 }}>
+          <p className={`${styles.footer} ${styles.footerSpaced}`}>
             <Link className={styles.link} href='/login'>
               Back to log in
             </Link>
