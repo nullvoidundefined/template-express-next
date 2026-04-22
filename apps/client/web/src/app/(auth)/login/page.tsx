@@ -1,12 +1,25 @@
 'use client';
 
-import { type FormEvent, useCallback, useState } from 'react';
+import { type FormEvent, Suspense, useCallback, useState } from 'react';
 
 import { useAuth } from '@/state/useAuth';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import styles from '../auth.module.scss';
+
+function ResetSuccessBanner() {
+  const searchParams = useSearchParams();
+  const resetSuccess = searchParams.get('reset') === 'true';
+  if (!resetSuccess) return null;
+  return (
+    <p className={styles.hint} role='status'>
+      Password reset successfully. Please log in.
+    </p>
+  );
+}
+
+ResetSuccessBanner.displayName = 'ResetSuccessBanner';
 
 function LoginPage() {
   const router = useRouter();
@@ -15,9 +28,6 @@ function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState('');
-
-  const searchParams = useSearchParams();
-  const resetSuccess = searchParams.get('reset') === 'true';
 
   const handleSubmit = useCallback(
     async (e: FormEvent) => {
@@ -40,15 +50,9 @@ function LoginPage() {
     <main className={styles.page} data-test-id='login-page'>
       <div className={styles.card}>
         <h1 className={styles.title}>Log in</h1>
-        {resetSuccess && (
-          <p
-            className={styles.hint}
-            role='status'
-            style={{ marginBottom: 16, color: 'green' }}
-          >
-            Password reset successfully. Please log in.
-          </p>
-        )}
+        <Suspense fallback={null}>
+          <ResetSuccessBanner />
+        </Suspense>
         <form
           className={styles.form}
           data-test-id='login-form'

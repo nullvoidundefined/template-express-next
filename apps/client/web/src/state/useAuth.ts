@@ -3,6 +3,7 @@
 import { api } from '@/services/api';
 import type { User } from '@repo/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import posthog from 'posthog-js';
 import { z } from 'zod';
 
 export type { User };
@@ -41,12 +42,18 @@ function useAuth() {
         body: { email, password },
         method: 'POST',
       }).then((d) => d.user),
-    onSuccess: (data) => queryClient.setQueryData(AUTH_KEY, data),
+    onSuccess: (data) => {
+      queryClient.setQueryData(AUTH_KEY, data);
+      posthog.identify(data.id, { email: data.email });
+    },
   });
 
   const logoutMutation = useMutation({
     mutationFn: () => api('/auth/logout', { method: 'POST' }),
-    onSuccess: () => queryClient.setQueryData(AUTH_KEY, null),
+    onSuccess: () => {
+      queryClient.setQueryData(AUTH_KEY, null);
+      posthog.reset();
+    },
   });
 
   const registerMutation = useMutation({
@@ -55,7 +62,10 @@ function useAuth() {
         body: { email, password },
         method: 'POST',
       }).then((d) => d.user),
-    onSuccess: (data) => queryClient.setQueryData(AUTH_KEY, data),
+    onSuccess: (data) => {
+      queryClient.setQueryData(AUTH_KEY, data);
+      posthog.identify(data.id, { email: data.email });
+    },
   });
 
   const forgotPasswordMutation = useMutation({
