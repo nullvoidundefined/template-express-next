@@ -21,6 +21,10 @@ import {
 } from 'vitest';
 
 vi.mock('app/repositories/auth/auth.js');
+vi.mock('app/services/analytics/analytics.js', () => ({
+  ANALYTICS_EVENTS: {},
+  trackEvent: vi.fn(),
+}));
 vi.mock('app/services/email/email.js', () => ({
   sendPasswordResetEmail: vi.fn(),
 }));

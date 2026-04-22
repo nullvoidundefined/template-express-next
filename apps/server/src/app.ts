@@ -1,5 +1,6 @@
+import * as Sentry from '@sentry/node';
 import { corsConfig } from 'app/config/corsConfig.js';
-import { isProduction } from 'app/config/env.js';
+import { env, isProduction } from 'app/config/env.js';
 import { pool, query } from 'app/db/pool/pool.js';
 import { csrfGuard } from 'app/middleware/csrfGuard/csrfGuard.js';
 import { errorHandler } from 'app/middleware/errorHandler/errorHandler.js';
@@ -13,6 +14,13 @@ import { logger } from 'app/utils/logs/logger.js';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
+
+if (env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: env.SENTRY_DSN,
+    environment: process.env.NODE_ENV,
+  });
+}
 
 function validateEnv(): void {
   if (!process.env.DATABASE_URL) {
@@ -89,6 +97,10 @@ app.use(loadSession);
 app.use('/auth', authRouter);
 
 app.use(notFoundHandler);
+if (env.SENTRY_DSN) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  app.use(Sentry.expressErrorHandler() as any);
+}
 app.use(errorHandler);
 
 const PORT = Number(process.env.PORT) || 3001;

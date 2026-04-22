@@ -9,6 +9,10 @@ import {
   resetPasswordSchema,
   updateMeSchema,
 } from 'app/schemas/auth.js';
+import {
+  ANALYTICS_EVENTS,
+  trackEvent,
+} from 'app/services/analytics/analytics.js';
 import * as emailService from 'app/services/email/email.js';
 import { logger } from 'app/utils/logs/logger.js';
 import bcrypt from 'bcrypt';
@@ -53,6 +57,7 @@ export async function register(req: Request, res: Response): Promise<void> {
       { event: 'register_success', userId: user.id, ip: req.ip },
       'User registered',
     );
+    trackEvent(user.id, ANALYTICS_EVENTS.USER_REGISTERED);
     res.cookie(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions());
     res.status(201).json({ user: toUserResponse(user) });
   } catch (err) {
@@ -94,6 +99,7 @@ export async function login(req: Request, res: Response): Promise<void> {
     { event: 'login_success', userId: user.id, ip: req.ip },
     'User logged in',
   );
+  trackEvent(user.id, ANALYTICS_EVENTS.USER_LOGGED_IN);
   res.cookie(SESSION_COOKIE_NAME, sessionId, sessionCookieOptions());
   res.json({ user: toUserResponse(user) });
 }
@@ -109,6 +115,7 @@ export async function logout(req: Request, res: Response): Promise<void> {
   }
   const userId = req.user?.id;
   logger.info({ event: 'logout', userId, ip: req.ip }, 'User logged out');
+  if (userId) trackEvent(userId, ANALYTICS_EVENTS.USER_LOGGED_OUT);
   res.clearCookie(SESSION_COOKIE_NAME, { path: '/' });
   res.status(204).send();
 }
@@ -150,6 +157,7 @@ export async function forgotPassword(
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
       await authRepo.createPasswordReset(user.id, tokenHash, expiresAt);
+      trackEvent(user.id, ANALYTICS_EVENTS.PASSWORD_RESET_REQUESTED);
 
       const resetUrl = `${process.env.CLIENT_URL ?? 'http://localhost:3000'}/reset-password?token=${rawToken}`;
       await emailService.sendPasswordResetEmail(email, resetUrl);
@@ -195,6 +203,7 @@ export async function resetPassword(
     { event: 'password_reset_success', userId: user.id },
     'Password reset successfully',
   );
+  trackEvent(user.id, ANALYTICS_EVENTS.PASSWORD_RESET_COMPLETED);
   res.status(204).send();
 }
 
@@ -242,6 +251,7 @@ export async function updateMe(req: Request, res: Response): Promise<void> {
       passwordHash: newPasswordHash,
     });
     logger.info({ event: 'password_changed', userId }, 'User changed password');
+    trackEvent(userId, ANALYTICS_EVENTS.PROFILE_UPDATED);
     res.json({ user: toUserResponse(updated) });
     return;
   }
