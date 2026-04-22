@@ -1,10 +1,15 @@
+import crypto from 'node:crypto';
+import bcrypt from 'bcrypt';
+import type { Request, Response } from 'express';
 import { isProduction } from 'app/config/env.js';
 import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from 'app/constants/session.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import type { User } from 'app/schemas/auth.js';
-import { loginSchema, registerSchema } from 'app/schemas/auth.js';
+import { forgotPasswordSchema, loginSchema, registerSchema } from 'app/schemas/auth.js';
+import * as emailService from 'app/services/email/email.js';
 import { logger } from 'app/utils/logs/logger.js';
-import type { Request, Response } from 'express';
+
+const SALT_ROUNDS = 12;
 
 function toUserResponse(user: User) {
   return {
@@ -104,4 +109,39 @@ export async function logout(req: Request, res: Response): Promise<void> {
 
 export async function me(req: Request, res: Response): Promise<void> {
   res.json({ user: toUserResponse(req.user!) });
+}
+
+export async function forgotPassword(req: Request, res: Response): Promise<void> {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    const message = parsed.error.issues.map((e) => e.message).join('; ');
+    res.status(400).json({ error: { message } });
+    return;
+  }
+
+  const { email } = parsed.data;
+
+  // Always return 200 regardless of whether the email exists (prevents user enumeration).
+  res.status(200).json({ message: 'If that email is registered, you will receive a reset link shortly.' });
+
+  // Fire-and-forget after responding so latency is not exposed to the caller.
+  void (async () => {
+    try {
+      const user = await authRepo.findUserByEmail(email);
+      if (!user) return;
+
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(rawToken, 'utf8').digest('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await authRepo.createPasswordReset(user.id, tokenHash, expiresAt);
+
+      const resetUrl = `${process.env.CLIENT_URL ?? 'http://localhost:3000'}/reset-password?token=${rawToken}`;
+      await emailService.sendPasswordResetEmail(email, resetUrl);
+
+      logger.info({ event: 'password_reset_email_sent', userId: user.id }, 'Password reset email dispatched');
+    } catch (err) {
+      logger.error({ err, event: 'password_reset_email_error' }, 'Error sending password reset email');
+    }
+  })();
 }

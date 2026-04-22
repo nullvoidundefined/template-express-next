@@ -5,12 +5,16 @@ import { errorHandler } from 'app/middleware/errorHandler/errorHandler.js';
 import { requireAuth } from 'app/middleware/requireAuth/requireAuth.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import type { User } from 'app/schemas/auth.js';
+import * as emailService from 'app/services/email/email.js';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('app/repositories/auth/auth.js');
+vi.mock('app/services/email/email.js', () => ({
+  sendPasswordResetEmail: vi.fn(),
+}));
 vi.mock('app/utils/logs/logger.js', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
@@ -22,6 +26,7 @@ app.use(cookieParser());
 app.post('/register', authHandlers.register);
 app.post('/login', authHandlers.login);
 app.post('/logout', authHandlers.logout);
+app.post('/forgot-password', authHandlers.forgotPassword);
 app.get(
   '/me',
   (req, res, next) => {
@@ -211,6 +216,35 @@ describe('auth handlers', () => {
         id,
         updatedAt: null,
       });
+    });
+  });
+
+  describe('forgotPassword', () => {
+    it('returns 400 when body invalid', async () => {
+      const res = await request(app).post('/forgot-password').send({});
+      expect(res.status).toBe(400);
+    });
+    it('returns 200 and sends email when user found', async () => {
+      vi.mocked(authRepo.findUserByEmail).mockResolvedValueOnce(mockUser);
+      vi.mocked(authRepo.createPasswordReset).mockResolvedValueOnce(undefined);
+      vi.mocked(emailService.sendPasswordResetEmail).mockResolvedValueOnce(undefined);
+
+      const res = await request(app)
+        .post('/forgot-password')
+        .send({ email: 'user@example.com' });
+
+      expect(res.status).toBe(200);
+      await vi.waitFor(() => expect(emailService.sendPasswordResetEmail).toHaveBeenCalledOnce());
+    });
+    it('returns 200 and does NOT send email when user not found', async () => {
+      vi.mocked(authRepo.findUserByEmail).mockResolvedValueOnce(null);
+
+      const res = await request(app)
+        .post('/forgot-password')
+        .send({ email: 'nobody@example.com' });
+
+      expect(res.status).toBe(200);
+      await vi.waitFor(() => expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled());
     });
   });
 });
