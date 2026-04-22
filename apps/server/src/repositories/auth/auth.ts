@@ -152,3 +152,91 @@ export async function createUserAndSession(
     return { user, sessionId };
   });
 }
+
+/** Stores a password-reset token hash. The raw token is sent to the user; only the hash is persisted. */
+export async function createPasswordReset(
+  userId: string,
+  tokenHash: string,
+  expiresAt: Date,
+): Promise<void> {
+  await query(
+    'INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+    [userId, tokenHash, expiresAt],
+  );
+}
+
+/**
+ * Atomically validates a password-reset token, updates the user's password,
+ * marks the token used, and deletes all sessions for the user.
+ * Returns null when the token is invalid, expired, or already used.
+ */
+export async function consumePasswordReset(
+  tokenHash: string,
+  newPasswordHash: string,
+): Promise<User | null> {
+  return withTransaction(async (client) => {
+    const resetResult = await query<{
+      expires_at: Date;
+      id: string;
+      used_at: Date | null;
+      user_id: string;
+    }>(
+      `SELECT id, user_id, expires_at, used_at
+       FROM password_resets
+       WHERE token_hash = $1`,
+      [tokenHash],
+      client,
+    );
+    const reset = resetResult.rows[0];
+    if (!reset) return null;
+    if (reset.used_at) return null;
+    if (reset.expires_at < new Date()) return null;
+
+    const userResult = await query<User>(
+      `UPDATE users SET password_hash = $1
+       WHERE id = $2
+       RETURNING id, email, created_at, updated_at`,
+      [newPasswordHash, reset.user_id],
+      client,
+    );
+    const user = userResult.rows[0];
+    if (!user) return null;
+
+    await query(
+      'UPDATE password_resets SET used_at = NOW() WHERE id = $1',
+      [reset.id],
+      client,
+    );
+    await query('DELETE FROM sessions WHERE user_id = $1', [reset.user_id], client);
+
+    return user;
+  });
+}
+
+/** Updates user's password hash. Callers hash the password before calling. */
+export async function updateUser(
+  userId: string,
+  fields: { passwordHash?: string },
+): Promise<User> {
+  const setClauses: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (fields.passwordHash !== undefined) {
+    setClauses.push(`password_hash = $${idx++}`);
+    values.push(fields.passwordHash);
+  }
+
+  if (setClauses.length === 0) {
+    throw new Error('updateUser called with no fields to update');
+  }
+
+  values.push(userId);
+  const result = await query<User>(
+    `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING id, email, created_at, updated_at`,
+    values,
+  );
+  const row = result.rows[0];
+  if (!row) throw new Error('updateUser: no row returned');
+  return row;
+}

@@ -274,3 +274,39 @@ describe('auth repository', () => {
     );
   });
 });
+
+describe('createPasswordReset', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('inserts a password_reset row and returns void', async () => {
+    mockQuery.mockResolvedValueOnce(mockResult([], 1));
+    await expect(
+      authRepo.createPasswordReset('user-id', 'hashed-token', new Date()),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('updateUser', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('updates passwordHash and returns updated user', async () => {
+    const updated: { id: string; email: string; created_at: Date; updated_at: Date } = {
+      id: uuid(),
+      email: 'a@b.com',
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    mockQuery.mockResolvedValueOnce(mockResult([updated]));
+    const result = await authRepo.updateUser(updated.id, { passwordHash: 'new-hash' });
+    expect(result).toEqual(updated);
+  });
+
+  it('throws if no row returned', async () => {
+    mockQuery.mockResolvedValueOnce(mockResult([], 0));
+    await expect(authRepo.updateUser('id', { passwordHash: 'h' })).rejects.toThrow();
+  });
+});
