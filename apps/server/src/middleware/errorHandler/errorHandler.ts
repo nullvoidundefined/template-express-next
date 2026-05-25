@@ -1,3 +1,4 @@
+import { env } from 'app/config/env.js';
 import { logger } from 'app/utils/logs/logger.js';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -10,7 +11,7 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ) {
-  const isProd = process.env.NODE_ENV === 'production';
+  const isProd = env.NODE_ENV === 'production';
   const status =
     err &&
     typeof err === 'object' &&

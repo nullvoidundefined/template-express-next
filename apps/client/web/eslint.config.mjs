@@ -18,7 +18,15 @@ const compat = new FlatCompat({ baseDirectory: __dirname });
 
 export default tseslint.config([
   {
-    ignores: ['node_modules', '.next', 'out', 'build', '**/*.d.ts'],
+    ignores: [
+      'node_modules',
+      '.next',
+      'out',
+      'build',
+      '**/*.d.ts',
+      '.storybook/**',
+      '**/*.stories.tsx',
+    ],
   },
   // Extend next/core-web-vitals; filter react-hooks to avoid plugin conflict below
   ...compat

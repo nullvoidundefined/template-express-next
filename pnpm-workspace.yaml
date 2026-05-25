@@ -1,9 +1,6 @@
 packages:
   - 'apps/server'
   - 'apps/client/web'
-  - 'apps/client/extension'
-  - 'apps/client/mobile'
-  - 'packages/client-shared'
   - 'packages/constants'
   - 'packages/tokens'
   - 'packages/types'

@@ -53,11 +53,15 @@ commit-msg:
         fi
 
 pre-push:
-  parallel: true
+  piped: true
   commands:
-    build:
-      run: pnpm build
+    format:
+      run: pnpm format:check
+    lint:
+      run: pnpm lint
     test-server:
-      run: pnpm --filter ./apps/server run test:coverage
+      run: pnpm test:coverage
     test-web:
       run: pnpm --filter ./apps/client/web run test
+    build:
+      run: pnpm build

@@ -37,6 +37,9 @@ jobs:
       - name: Run tests with coverage
         run: pnpm run test:coverage
 
+      - name: Run web tests
+        run: pnpm --filter ./apps/client/web run test
+
       - name: Build
         run: pnpm run build
 
@@ -44,6 +47,15 @@ jobs:
     needs: build-and-test
     runs-on: ubuntu-latest
     services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-retries 5
+          --health-timeout 5s
       postgres:
         image: postgres:16
         env:
@@ -78,6 +90,11 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/template_test
 
+      - name: Seed test data
+        run: pnpm --filter ./apps/server run seed:test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/template_test
+
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
@@ -88,4 +105,5 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/template_test
           NEXT_PUBLIC_API_URL: http://localhost:3001
           NODE_ENV: test
+          REDIS_URL: redis://localhost:6379
           SESSION_SECRET: ci-test-secret-minimum-32-characters

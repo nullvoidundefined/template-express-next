@@ -44,11 +44,12 @@ These apply to the whole repo. Additional non-negotiables specific to each works
 23. **Session cookies: correct `SameSite` and `Secure` flags.** `SameSite: 'lax'` when frontend and backend share the same Railway domain. `SameSite: 'none'` + `secure: true` only when running on separate domains. `httpOnly: true` always.
 24. **Per-component folder structure.** Every component lives in `ComponentName/ComponentName.tsx` plus `ComponentName.module.scss`. Never a flat `.tsx` directly under `components/`.
 25. **`displayName` and `data-test-id` on every component.** Set `ComponentName.displayName = 'ComponentName'` immediately after the function definition. Outermost DOM element has `data-test-id` in kebab-case.
-26. **TanStack Query for all server state.** No raw `useEffect` + `fetch` in components. All API calls go through `useQuery` and `useMutation`.
-27. **Cloudflare R2 for all image storage.** Store keys in the database, not full URLs. Derive the public URL at read time. Validate file size and MIME type on the server before upload.
-28. **Sentry on both server and client from day one.** Initialize before any business logic. Set user context in `loadSession`. Upload source maps in CI on every production deploy.
-29. **Commit `pnpm-lock.yaml` with every `package.json` change.** CI uses `--frozen-lockfile`.
-30. **Build runs on pre-push.** The lefthook `pre-push` hook runs `pnpm build`. A broken build never lands on `main`.
+26. **State management by layer.** See State Management table below.
+27. **TanStack Query for all server state.** No raw `useEffect` + `fetch` in components. All API calls go through `useQuery` and `useMutation`.
+28. **Cloudflare R2 for all image storage.** Store keys in the database, not full URLs. Derive the public URL at read time. Validate file size and MIME type on the server before upload.
+29. **Sentry on both server and client from day one.** Initialize before any business logic. Set user context in `loadSession`. Upload source maps in CI on every production deploy.
+30. **Commit `pnpm-lock.yaml` with every `package.json` change.** CI uses `--frozen-lockfile`.
+31. **Build runs on pre-push.** The lefthook `pre-push` hook runs `pnpm build`. A broken build never lands on `main`.
 
 ---
 
@@ -68,6 +69,7 @@ These apply to the whole repo. Additional non-negotiables specific to each works
 
 ```bash
 pnpm dev                    # Start both server + client-web
+pnpm dev:payments           # dev server + Stripe CLI listener
 pnpm build                  # Build both
 pnpm lint                   # Lint all workspaces
 pnpm format:check           # Check formatting
@@ -76,7 +78,57 @@ pnpm test:coverage          # Unit tests with coverage
 pnpm --filter server run test:integration
 pnpm --filter server run migrate:up
 pnpm --filter server run migrate:down
+./scripts/deploy.sh [production|staging] [full|web|server|migrate]
+./scripts/dev-watch.sh       # Auto-restart with .next cache clear
+./scripts/ensure-test-db.sh  # Bootstrap E2E test database
 ```
+
+### State Management
+
+| Tool           | Use for                                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| TanStack Query | Server state (API data, cache, mutations)                                                                        |
+| Zustand        | Cross-component client state (modal queue, toast queue, UI preferences, complex form state shared across routes) |
+| React Context  | Providers wrapping the tree (auth session object)                                                                |
+| useState       | Local component UI state                                                                                         |
+
+Rule: Zustand is approved for the use cases above. Do not reach for it when TanStack Query (server state) or useState (local UI) would suffice.
+
+---
+
+## Infrastructure
+
+### Stripe Billing
+
+- The Stripe webhook route (`POST /webhooks/stripe`) must be registered before `express.json()`. Stripe sends a raw body; `express.json()` would parse and destroy it before signature verification.
+- Idempotency pattern: record processed event IDs in a `stripe_events` table before handling. Check for duplicates at the top of the webhook handler.
+- The raw body is consumed by `express.raw({ type: 'application/json' })` applied only to that route.
+- Webhook secret in `STRIPE_WEBHOOK_SECRET`. Always verify the signature; never trust the payload without it.
+
+### Redis
+
+- Two-client pattern. `redis` (BullMQ) uses `maxRetriesPerRequest: null` (required by BullMQ). `redisRateLimiter` uses `maxRetriesPerRequest: 3`.
+- Both clients are `null` when `REDIS_URL` is unset. All Redis-dependent code degrades gracefully when the client is null.
+- A production warning is emitted at startup when `REDIS_URL` is absent.
+
+### BullMQ
+
+- Queue and worker are separated. The queue (`queue.ts`) is imported by API handlers to enqueue jobs. The worker (`worker.ts`) is a separate process entry point.
+- Worker runs as `pnpm dev:worker` in development and as a separate Railway service in production.
+- To add a new job type: define the payload type, add an enqueue function in `queue.ts`, add a `case` branch in `worker.ts`.
+
+### Cloudflare R2
+
+- Key pattern: `{entity-type}/{entity-id}/{uuid}.{ext}`. Store the key in the database; derive the public URL at read time.
+- Keys are validated against `/^[a-zA-Z0-9\-_/.]+$/` and checked for `..` path traversal before any S3 call.
+- Presigned URL pattern: use `getPresignedUrl(key, expiresIn)` for client-side uploads and direct downloads.
+- Validate file size and MIME type on the server before issuing a presigned URL.
+
+### Circuit Breaker
+
+- Use when calling unreliable external services (third-party APIs, webhooks).
+- Backed by Redis. The circuit state is stored at `circuit:external:state`. When Redis is absent, the circuit always reports closed (fail open).
+- `isCircuitOpen()` before the call; `tripCircuit()` on repeated failure; `closeCircuit()` on recovery or manual reset.
 
 ---
 
@@ -205,6 +257,28 @@ Rules:
 - Integration tests that span multiple layers go in `src/__tests__/integration/`. Name them after the flow they test: `auth-flow.test.ts`, `create-item.test.ts`.
 - Test utilities and shared fixtures go in `src/__tests__/helpers/`. Never import from outside this directory in test files.
 - `vitest.config.ts` at each workspace root sets `include: ['src/__tests__/**/*.test.ts']` (or `.tsx`).
+
+### E2E Tests
+
+E2E tests run in CI only, not in the pre-push hook. Pre-push runs the build; E2E requires a running stack and a seeded test database.
+
+To run E2E locally:
+
+```bash
+pnpm test:e2e          # requires running server + client
+pnpm test:smoke        # smoke tests (lighter, against built output)
+```
+
+### Storybook and Visual Regression
+
+Every component in `apps/client/web/src/components/` requires a co-located `*.stories.tsx` file. Stories use `export default` and named story exports -- the `export default` exception for story files is explicitly allowed.
+
+Visual regression tests run against the Storybook static build:
+
+```bash
+pnpm test:visual               # build Storybook + run visual regression
+pnpm test:visual:update        # update baseline snapshots
+```
 
 ### Why not co-located
 

@@ -1,0 +1,30 @@
+.overlay {
+    background: var(--overlay);
+    inset: 0;
+    position: fixed;
+}
+
+.content {
+    background: var(--background);
+    border-radius: var(--radius-card);
+    left: 50%;
+    max-height: 85vh;
+    max-width: 560px;
+    overflow-y: auto;
+    padding: 24px;
+    position: fixed;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+}
+
+.srOnly {
+    clip: rect(0 0 0 0);
+    border: 0;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+}

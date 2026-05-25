@@ -1,6 +1,0 @@
-{
-  "name": "@doppelscript/extension",
-  "version": "0.0.1",
-  "private": true,
-  "description": "WXT browser extension scaffold (Chrome MV3, Firefox, Safari, Edge). Not yet implemented."
-}

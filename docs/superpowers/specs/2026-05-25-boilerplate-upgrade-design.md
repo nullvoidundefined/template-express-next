@@ -123,12 +123,12 @@ Note: Theme is a Zustand store, not a provider. `ThemeScript` is a `<script>` ta
 
 ### State management rules
 
-| Tool | Use for |
-|---|---|
-| TanStack Query | Server state (API data, cache, mutations) |
-| Zustand | Cross-component client state (modal queue, toast queue, UI preferences, complex form state shared across routes) |
-| React Context | Providers wrapping the tree (auth session object) |
-| useState | Local component UI state |
+| Tool           | Use for                                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------------------- |
+| TanStack Query | Server state (API data, cache, mutations)                                                                        |
+| Zustand        | Cross-component client state (modal queue, toast queue, UI preferences, complex form state shared across routes) |
+| React Context  | Providers wrapping the tree (auth session object)                                                                |
+| useState       | Local component UI state                                                                                         |
 
 ### Modal queue (Zustand store)
 
@@ -144,11 +144,14 @@ type ModalStore = {
   closeAllModals: () => void;
   closeModal: (id?: string) => void;
   modals: ModalEntry[];
-  openModal: (content: ReactNode, options?: {
-    id?: string;
-    onClose?: () => void;
-    preventClose?: boolean;
-  }) => string;
+  openModal: (
+    content: ReactNode,
+    options?: {
+      id?: string;
+      onClose?: () => void;
+      preventClose?: boolean;
+    },
+  ) => string;
 };
 ```
 
@@ -166,7 +169,10 @@ const ROUTE_MAP: Record<string, 'public' | 'private' | 'admin'> = {
   '/dashboard': 'private',
 };
 
-const PREFIX_RULES: Array<{ access: 'public' | 'private' | 'admin'; prefix: string }> = [
+const PREFIX_RULES: Array<{
+  access: 'public' | 'private' | 'admin';
+  prefix: string;
+}> = [
   { access: 'private', prefix: '/settings' },
   { access: 'admin', prefix: '/admin' },
 ];
@@ -180,6 +186,7 @@ Reads `sid` cookie. No API call. Redirects unauthenticated users on private/admi
 Zod schema parsing `process.env` at import time. Groups: required always, required in production only, optional with defaults. Exports frozen object + `isDev()`, `isProd()`, `isDeployed()` helpers. Server crashes at startup with clear error listing all missing/invalid variables.
 
 Required variables:
+
 - `DATABASE_URL`
 - `SESSION_SECRET`
 - `CORS_ORIGIN` (production only)
@@ -187,6 +194,7 @@ Required variables:
 - `STRIPE_WEBHOOK_SECRET` (production only)
 
 Optional with graceful degradation:
+
 - `REDIS_URL` (rate limiter falls back to in-memory, BullMQ logs warning)
 - `SENTRY_DSN` (Sentry no-ops)
 - `POSTHOG_API_KEY` (PostHog no-ops)

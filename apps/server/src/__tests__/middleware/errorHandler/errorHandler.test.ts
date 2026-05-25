@@ -11,6 +11,18 @@ vi.mock('app/utils/logs/logger.js', () => ({
   logger: { error: vi.fn() },
 }));
 
+// Use vi.hoisted so mockEnv is available inside the vi.mock factory (which is hoisted to top of file).
+const mockEnv = vi.hoisted(() => ({ NODE_ENV: 'development' as string }));
+vi.mock('app/config/env.js', () => ({
+  env: mockEnv,
+  isDev: true,
+  isProd: false,
+  isStaging: false,
+  isProduction: () => mockEnv.NODE_ENV === 'production',
+  isDeployed: () =>
+    mockEnv.NODE_ENV === 'production' || mockEnv.NODE_ENV === 'staging',
+}));
+
 const app = express();
 app.get('/boom', (_req: Request, _res: Response, next: NextFunction) => {
   next(new Error('kaboom'));
@@ -32,14 +44,12 @@ app.get(
 app.use(errorHandler);
 
 describe('errorHandler', () => {
-  const originalEnv = process.env.NODE_ENV;
-
   afterEach(() => {
-    process.env.NODE_ENV = originalEnv;
+    mockEnv.NODE_ENV = 'development';
   });
 
   it('returns 500 with error detail in non-production', async () => {
-    process.env.NODE_ENV = 'development';
+    mockEnv.NODE_ENV = 'development';
     const res = await request(app).get('/boom');
 
     expect(res.status).toBe(500);
@@ -47,7 +57,7 @@ describe('errorHandler', () => {
   });
 
   it('hides error detail in production for 500 errors', async () => {
-    process.env.NODE_ENV = 'production';
+    mockEnv.NODE_ENV = 'production';
     const res = await request(app).get('/boom');
 
     expect(res.status).toBe(500);
@@ -55,7 +65,7 @@ describe('errorHandler', () => {
   });
 
   it('respects err.status when present', async () => {
-    process.env.NODE_ENV = 'development';
+    mockEnv.NODE_ENV = 'development';
     const res = await request(app).get('/status-error');
 
     expect(res.status).toBe(404);
@@ -63,7 +73,7 @@ describe('errorHandler', () => {
   });
 
   it('respects err.statusCode when present', async () => {
-    process.env.NODE_ENV = 'development';
+    mockEnv.NODE_ENV = 'development';
     const res = await request(app).get('/status-code-error');
 
     expect(res.status).toBe(400);
@@ -71,7 +81,7 @@ describe('errorHandler', () => {
   });
 
   it('shows error message for non-500 errors even in production', async () => {
-    process.env.NODE_ENV = 'production';
+    mockEnv.NODE_ENV = 'production';
     const res = await request(app).get('/status-error');
 
     expect(res.status).toBe(404);

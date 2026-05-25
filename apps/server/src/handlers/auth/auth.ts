@@ -1,4 +1,4 @@
-import { isProduction } from 'app/config/env.js';
+import { env, isProduction } from 'app/config/env.js';
 import { SESSION_COOKIE_NAME, SESSION_TTL_MS } from 'app/constants/session.js';
 import { clearSession } from 'app/middleware/requireAuth/requireAuth.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
@@ -161,7 +161,7 @@ export async function forgotPassword(
       await authRepo.createPasswordReset(user.id, tokenHash, expiresAt);
       trackEvent(user.id, ANALYTICS_EVENTS.PASSWORD_RESET_REQUESTED);
 
-      const resetUrl = `${process.env.CLIENT_URL ?? 'http://localhost:3000'}/reset-password?token=${rawToken}`;
+      const resetUrl = `${env.CLIENT_URL}/reset-password?token=${rawToken}`;
       await emailService.sendPasswordResetEmail(email, resetUrl);
 
       logger.info(

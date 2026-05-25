@@ -1,0 +1,42 @@
+.viewport {
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  max-width: 400px;
+  padding: 0;
+  position: fixed;
+  right: 24px;
+  z-index: 9999;
+}
+
+.root {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-standard);
+  display: flex;
+  font-size: 14px;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.error {
+  border-color: var(--error);
+}
+
+.success {
+  border-color: var(--success);
+}
+
+.close {
+  background: none;
+  border: none;
+  color: var(--foreground-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+}

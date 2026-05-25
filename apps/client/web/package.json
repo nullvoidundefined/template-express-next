@@ -19,6 +19,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-toast": "^1.2.15",
     "@repo/constants": "workspace:^",
     "@repo/types": "workspace:*",
     "@sentry/nextjs": "^10.49.0",
@@ -28,7 +30,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sass": "^1.86.0",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

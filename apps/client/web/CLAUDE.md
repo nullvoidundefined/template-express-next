@@ -202,11 +202,12 @@ TypeScript rules (strict mode, no `any`, `type` vs `interface`, Zod schemas, dis
 ### State Management
 
 - TanStack Query for all server state (fetching, caching, mutations).
-- React Context for auth state and app-wide concerns.
-- `useState` for local UI state (form inputs, modals, toggles).
+- Zustand for cross-component client state: `useToastStore`, `useModalStore`, `useTheme`. See the Zustand Stores section in `../CLAUDE.md`.
+- React Context for auth session object and other app-wide providers.
+- `useState` for local UI state (form inputs, toggles).
 - `useCallback` for memoizing handlers.
 - `useRef` for DOM refs and stable references.
-- No Redux, Zustand, or other state libraries.
+- No Redux, Jotai, or Recoil.
 
 ### API Calls
 
@@ -250,6 +251,34 @@ export const api = {
   };
   ```
 - Font system via `next/font/google` with CSS variable injection.
+
+### Next.js Middleware Route Map
+
+`src/middleware.ts` uses two structures to determine access level for each route:
+
+- `ROUTE_MAP`: exact path matches (`Record<string, Access>`). Add new exact paths here.
+- `PREFIX_RULES`: prefix matches (`Array<{ prefix, access }>`). Add new route groups here (e.g., `/settings`, `/admin`).
+- Default for unlisted routes: `'private'`.
+
+Access values: `'public'` (no auth required), `'private'` (must have `sid` cookie), `'admin'` (must have `sid` + admin flag).
+
+To add a new route:
+
+1. Public page: add `'/your-path': 'public'` to `ROUTE_MAP`.
+2. Protected section: add `{ prefix: '/your-section', access: 'private' }` to `PREFIX_RULES`.
+3. The `sid` cookie presence is the only check in middleware. The real auth gate is the `(protected)` layout server component.
+
+### API Proxy Route
+
+All `/api/*` requests are proxied to the Express backend via `src/app/api/[...path]/route.ts`. This lets server components and actions call the API without CORS issues and without exposing `INTERNAL_API_URL` to the browser.
+
+- Env var: `INTERNAL_API_URL` (Railway internal URL; not `NEXT_PUBLIC_`).
+- The proxy forwards the method, body, and `Cookie` header. It does not forward all headers to avoid leaking internal values.
+- Client-side code still uses `NEXT_PUBLIC_API_URL` through `services/api.ts`.
+
+### Storybook
+
+Every component in `src/components/` requires a co-located `*.stories.tsx` file created or updated in the same commit as the component. `export default` is allowed in story files and `.storybook/` config files -- this is an explicit exception to the named-exports-only rule.
 
 ### Testing (Frontend)
 

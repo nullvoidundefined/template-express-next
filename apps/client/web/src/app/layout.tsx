@@ -1,3 +1,5 @@
+import { ModalProvider } from '@/components/ui/Modal/Modal';
+import { ToastViewport } from '@/components/ui/Toast/Toast';
 import { PostHogProvider } from '@/providers/PostHogProvider';
 import { QueryProvider } from '@/providers/QueryProvider';
 import type { Metadata } from 'next';
@@ -16,16 +18,27 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  description: 'Express 5 + Next.js 15 + TypeScript monorepo for Doppelscript',
-  title: 'Doppelscript',
+  description: 'Express 5 + Next.js 15 full-stack application',
+  title: 'App',
 };
 
 function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang='en'>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('app-theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.dataset.theme='dark'}}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
         <PostHogProvider>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            {children}
+            <ToastViewport />
+            <ModalProvider />
+          </QueryProvider>
         </PostHogProvider>
       </body>
     </html>

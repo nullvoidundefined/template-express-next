@@ -168,7 +168,10 @@ function processResponse(data: unknown): string {
   if (typeof data !== 'object' || data === null) {
     throw new Error('Expected object');
   }
-  if (!('name' in data) || typeof (data as { name: unknown }).name !== 'string') {
+  if (
+    !('name' in data) ||
+    typeof (data as { name: unknown }).name !== 'string'
+  ) {
     throw new Error('Expected name string');
   }
   return (data as { name: string }).name;
@@ -203,6 +206,7 @@ Every React file falls into one of two categories. Assign the category before wr
 **Atomic components** -- reusable building blocks composed of HTML elements (web) or React Native primitives (mobile). They are layout-agnostic, accept props, and have no knowledge of the page or screen they live on. Examples: `Button`, `InputField`, `Badge`, `Avatar`, `Card`. These live in `components/`.
 
 Rules for atomic components:
+
 - Accept all content via props. No hard-coded copy.
 - No direct API calls, no TanStack Query hooks, no navigation calls.
 - Styled entirely through their own SCSS module (web) or `.styles.ts` (mobile).
@@ -211,6 +215,7 @@ Rules for atomic components:
 **Pages, screens, and containers** -- top-level views that assemble atomic components into a full layout. Examples: `LoginPage`, `DashboardScreen`, `SettingsContainer`. These live in `app/` (web and mobile) or `entrypoints/popup/` (extension).
 
 Rules for pages/screens/containers:
+
 - Are composed primarily of imported components. Minimal raw HTML or JSX elements directly in the return statement.
 - Own data fetching via TanStack Query (`useQuery`, `useMutation`) or state from `state/`.
 - Own navigation and routing logic.
@@ -318,9 +323,56 @@ Rules:
 
 - **TanStack Query for all server state, on every client surface.** Fetch, cache, refetch, and mutate through `useQuery` and `useMutation`. This applies to web, extension popup/options, and mobile screens alike. The only exception is the background service worker in the extension, which runs outside React.
 - **No raw `useEffect` + `fetch`.** If code is fetching from the API inside a `useEffect`, it is wrong. Replace it with `useQuery`.
-- **React Context for app-wide client state.** Auth, theme, feature flags. One context per concern; do not bundle unrelated state into a single context.
-- **`useState` for local UI state.** Form inputs, modal open/close, toggle state.
-- **No Redux, Zustand, Jotai, or Recoil** in this template. The combination of TanStack Query and React Context covers the use cases.
+- **Zustand for cross-component client state.** Modal queue, toast queue, UI preferences, and complex form state shared across routes. See the Zustand Stores section.
+- **React Context for app-wide providers.** Auth session object. One context per concern; do not bundle unrelated state into a single context.
+- **`useState` for local UI state.** Form inputs, toggles, and component-level state that nothing else needs.
+- **No Redux, Jotai, or Recoil** in this template.
+
+### Zustand Stores
+
+Zustand stores live in `apps/client/web/src/state/` alongside hooks. Use them when state must be accessed or mutated by components that are not in a direct parent-child relationship.
+
+**When to use Zustand vs alternatives:**
+
+| Situation                                     | Use                       |
+| --------------------------------------------- | ------------------------- |
+| Server data (API response, list, single item) | TanStack Query            |
+| Auth session object accessible app-wide       | React Context             |
+| Toast notifications triggered from anywhere   | Zustand (`useToastStore`) |
+| Modal queue (open/close from any component)   | Zustand (`useModalStore`) |
+| Theme preference persisted to localStorage    | Zustand (`useTheme`)      |
+| Form input controlled by one component        | useState                  |
+
+**`useToastStore` API:**
+
+```typescript
+const { addToast } = useToastStore();
+addToast('Saved', 'success'); // type defaults to 'info', duration to 5000ms
+addToast('Failed to save', 'error', 8000);
+```
+
+Types: `'error' | 'info' | 'success'`. Toasts auto-dismiss after `duration` ms.
+
+**`useModalStore` API:**
+
+```typescript
+const { openModal, closeModal, closeAllModals } = useModalStore();
+const id = openModal(<MyComponent />, { preventClose: false });
+closeModal();        // close top modal
+closeModal(id);      // close specific modal by ID
+closeAllModals();    // close all modals
+```
+
+Modals stack. `preventClose: true` disables the backdrop click and ESC dismiss.
+
+**`useTheme` API:**
+
+```typescript
+const { setTheme, theme } = useTheme();
+setTheme('dark'); // 'dark' | 'light' | 'system'
+```
+
+Storage key: `app-theme`. Applied via `data-theme='dark'` attribute on `<html>`. Flash prevention requires an inline script in the root layout before hydration.
 
 ### Error Handling in UI
 
@@ -410,11 +462,11 @@ packages/tokens/
 
 How each platform consumes tokens:
 
-| Platform | Mechanism | Import |
-|----------|-----------|--------|
-| Web (Next.js) | CSS custom properties injected via SCSS partial | `@use '@repo/tokens/dist/tokens'` in `globals.scss` |
+| Platform        | Mechanism                                                                                     | Import                                                        |
+| --------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Web (Next.js)   | CSS custom properties injected via SCSS partial                                               | `@use '@repo/tokens/dist/tokens'` in `globals.scss`           |
 | Extension (WXT) | CSS custom properties (same partial) for popup/options; direct JS import for programmatic use | Same SCSS partial, or `import { tokens } from '@repo/tokens'` |
-| Mobile (Expo) | Direct JS import into `StyleSheet.create` calls | `import { tokens } from '@repo/tokens'` |
+| Mobile (Expo)   | Direct JS import into `StyleSheet.create` calls                                               | `import { tokens } from '@repo/tokens'`                       |
 
 ### The Token Contract
 
@@ -424,76 +476,76 @@ How each platform consumes tokens:
 // packages/tokens/src/tokens.ts
 export const tokens = {
   colors: {
-    accent:                '#e8651a',
-    accentHover:           '#c85411',
-    accentLight:           '#fdecd9',
-    background:            '#ffffff',
+    accent: '#e8651a',
+    accentHover: '#c85411',
+    accentLight: '#fdecd9',
+    background: '#ffffff',
     backgroundTranslucent: 'rgba(255, 255, 255, 0.92)',
-    border:                '#ebebeb',
-    error:                 '#ef4444',
-    foreground:            '#222222',
-    foregroundMuted:       '#717171',
-    surface:               '#f7f7f7',
-    surfaceActive:         '#e0e0e0',
-    surfaceAlt:            '#f0f0f0',
-    surfaceHover:          '#f0f0f0',
-    white:                 '#ffffff',
+    border: '#ebebeb',
+    error: '#ef4444',
+    foreground: '#222222',
+    foregroundMuted: '#717171',
+    surface: '#f7f7f7',
+    surfaceActive: '#e0e0e0',
+    surfaceAlt: '#f0f0f0',
+    surfaceHover: '#f0f0f0',
+    white: '#ffffff',
   },
   fontSizes: {
-    badge:      11,
-    caption:    12,
-    small:      13,
-    body:       14,
-    label:      15,
+    badge: 11,
+    caption: 12,
+    small: 13,
+    body: 14,
+    label: 15,
     subheading: 16,
-    subtitle:   18,
-    navLogo:    20,
-    section:    28,
+    subtitle: 18,
+    navLogo: 20,
+    section: 28,
     heroMobile: 32,
-    hero:       48,
+    hero: 48,
   },
   fontWeights: {
-    regular:   400,
-    medium:    500,
-    semibold:  600,
-    bold:      700,
-    black:     800,
+    regular: 400,
+    medium: 500,
+    semibold: 600,
+    bold: 700,
+    black: 800,
   },
   letterSpacing: {
-    hero:      '-0.03em',
-    heading:   '-0.02em',
+    hero: '-0.03em',
+    heading: '-0.02em',
     uppercase: '0.05em',
   },
   lineHeights: {
-    hero:      1.1,
-    body:      1.5,
+    hero: 1.1,
+    body: 1.5,
     paragraph: 1.6,
   },
   radii: {
-    subtle:  4,
+    subtle: 4,
     standard: 8,
-    button:  10,
-    card:    12,
-    large:   16,
-    pill:    20,
+    button: 10,
+    card: 12,
+    large: 16,
+    pill: 20,
   },
   spacing: {
-    1:  4,
-    2:  8,
-    3:  12,
-    4:  16,
-    5:  20,
-    6:  24,
-    7:  28,
-    8:  32,
-    9:  40,
+    1: 4,
+    2: 8,
+    3: 12,
+    4: 16,
+    5: 20,
+    6: 24,
+    7: 28,
+    8: 32,
+    9: 40,
     10: 48,
     11: 64,
     12: 80,
   },
   transitions: {
-    hover:  '0.15s',
-    state:  '0.20s',
+    hover: '0.15s',
+    state: '0.20s',
   },
 } as const;
 
@@ -521,7 +573,10 @@ for (const [name, value] of Object.entries(tokens.colors)) {
 }
 
 lines.push('}');
-writeFileSync(new URL('../dist/_tokens.scss', import.meta.url), lines.join('\n') + '\n');
+writeFileSync(
+  new URL('../dist/_tokens.scss', import.meta.url),
+  lines.join('\n') + '\n',
+);
 console.log('Generated dist/_tokens.scss');
 ```
 
@@ -562,8 +617,8 @@ Web component:
 ```scss
 // Button.module.scss
 .button {
-  background: var(--accent);       // CSS custom property from _tokens.scss
-  border-radius: 10px;             // tokens.radii.button via CSS var if added
+  background: var(--accent); // CSS custom property from _tokens.scss
+  border-radius: 10px; // tokens.radii.button via CSS var if added
   color: var(--white);
   transition: background var(--transition-hover, 0.15s);
 }
@@ -578,7 +633,7 @@ import { tokens } from '@repo/tokens';
 
 export const styles = StyleSheet.create({
   button: {
-    backgroundColor: tokens.colors.accent,   // same value, direct JS reference
+    backgroundColor: tokens.colors.accent, // same value, direct JS reference
     borderRadius: tokens.radii.button,
   },
 });

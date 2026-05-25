@@ -21,8 +21,9 @@ Applies to all `server/` code.
 ```
 src/
 ├── index.ts                      # Express app entry point
+├── worker.ts                     # BullMQ worker entry point (separate process)
 ├── config/                       # Configuration modules
-│   ├── env.ts                    # Environment helpers (isProduction, etc.)
+│   ├── env.ts                    # Zod-validated env (see Env Config section)
 │   └── corsConfig.ts             # CORS middleware config
 ├── constants/                    # Hard-coded constants
 │   └── session.ts
@@ -32,6 +33,9 @@ src/
 ├── handlers/                     # HTTP request handlers (thin: validate, delegate, respond)
 │   ├── auth/
 │   │   └── auth.ts
+│   ├── billing/
+│   │   ├── billing.ts            # Subscription/plan handlers
+│   │   └── webhook.ts            # Stripe webhook handler
 │   └── items/
 │       └── items.ts
 ├── middleware/
@@ -50,6 +54,7 @@ src/
 ├── repositories/                 # Data access layer (all SQL lives here)
 │   ├── auth/
 │   │   └── auth.ts
+│   ├── billing.ts                # Subscription queries
 │   └── items/
 │       └── items.ts
 ├── routes/                       # Express router definitions
@@ -58,8 +63,14 @@ src/
 ├── schemas/                      # Zod schemas + derived TypeScript types
 │   ├── auth.ts
 │   └── item.ts
-├── services/                     # Business logic layer
-│   └── example.service.ts
+├── services/                     # Business logic + infrastructure clients
+│   ├── billing.service.ts        # Stripe billing orchestration
+│   ├── circuit-breaker.ts        # Redis-backed circuit breaker
+│   ├── example.service.ts
+│   ├── queue.ts                  # BullMQ queue + createWorker factory
+│   ├── r2.ts                     # Cloudflare R2 upload/presign/delete
+│   ├── redis.ts                  # Two-client Redis setup (BullMQ + rate limiter)
+│   └── stripe.ts                 # Lazy Stripe client singleton
 ├── types/                        # TypeScript ambient declarations
 │   └── express.d.ts
 └── utils/
@@ -114,6 +125,28 @@ import { z } from 'zod';
 - Use the `type` keyword for type-only imports.
 - Use `app/*` path alias mapping to `src/*`. Never relative `../../` beyond one level.
 - All local imports end with `.js` extension (ESM resolution).
+
+### Env Config Pattern
+
+All environment variables are declared in `src/config/env.ts` using a Zod schema. This replaces the manual `validateEnv()` function from the previous pattern.
+
+- **Required vars:** `z.string().min(1, 'VAR is required')` or similar -- Zod throws at startup if absent.
+- **Optional vars:** `z.string().optional()` -- code that uses them must guard against `undefined` and degrade gracefully.
+- **Production-only warnings:** after parsing, emit `console.warn` for optional vars that should be set in production (e.g., `REDIS_URL`).
+- **Add a new var:** add to `envSchema`, re-export from `env`, add to `server/.env.example`.
+
+```typescript
+// Required:
+DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+
+// Optional with production warning (handled after parse):
+REDIS_URL: z.string().optional(),
+
+// Optional with default:
+PORT: z.coerce.number().default(3001),
+```
+
+After the schema is parsed, the frozen `env` object is the only place process.env is read. Never access `process.env` directly in application code.
 
 ### Entry Point Pattern
 
@@ -239,7 +272,17 @@ app.use(helmet());
 app.use(corsConfig);
 app.use(requestLogger);
 app.use(rateLimiter);
+
+// Stripe webhook needs raw body for signature verification.
+// Must be before express.json() -- json parser destroys the raw body.
+app.post(
+  '/webhooks/stripe',
+  express.raw({ type: 'application/json' }),
+  handleWebhook,
+);
+
 app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 app.use(cookieParser());
 app.use(csrfGuard);
 app.use(loadSession);
@@ -252,6 +295,8 @@ app.use('/items', itemsRouter);
 app.use(notFoundHandler);
 app.use(errorHandler);
 ```
+
+**Webhook ordering is non-negotiable.** Any route that requires the raw body (Stripe, GitHub webhooks, etc.) must be registered before `express.json()`.
 
 ### Router Pattern
 
@@ -275,6 +320,15 @@ export { itemsRouter };
 - Import handlers with `import * as` namespace import.
 - Apply auth middleware at the router level, not per route.
 - Named export for the router.
+
+### Worker Process
+
+`src/worker.ts` is a separate Node.js entry point for background job processing. It is not part of the HTTP server.
+
+- Start locally with `pnpm --filter server run worker` (or `pnpm dev:worker` from root).
+- In production, deploy as a separate Railway service with start command `node dist/worker.js`.
+- The worker exits immediately if `REDIS_URL` is unset (`process.exit(1)`).
+- To add a new job type: add the payload type and enqueue helper in `queue.ts`, then add a `case` in `worker.ts`'s `switch(job.name)` block.
 
 ### Handler Pattern
 

@@ -1,3 +1,4 @@
+import { env } from 'app/config/env.js';
 import { logger } from 'app/utils/logs/logger.js';
 import pg from 'pg';
 
@@ -7,12 +8,12 @@ export type PoolClient = pg.PoolClient;
 
 // Use CA cert for full SSL verification when provided (e.g. Neon, RDS).
 // Explicitly disable SSL for Railway private networking (no cert available/needed).
-const sslConfig = process.env.DATABASE_CA_CERT
-  ? { ssl: { ca: process.env.DATABASE_CA_CERT, rejectUnauthorized: true } }
+const sslConfig = env.DATABASE_CA_CERT
+  ? { ssl: { ca: env.DATABASE_CA_CERT, rejectUnauthorized: true } }
   : { ssl: false };
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: env.DATABASE_URL,
   max: 10,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
@@ -33,7 +34,7 @@ export async function query<T extends pg.QueryResultRow>(
       ? await target.query<T>(text, values)
       : await target.query<T>(text);
   const duration = Date.now() - start;
-  if (process.env.NODE_ENV !== 'production') {
+  if (env.NODE_ENV !== 'production') {
     logger.debug({ query: text, duration_ms: duration }, 'db query');
   }
   return result;

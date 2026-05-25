@@ -36,5 +36,6 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, 'migrations/**'],
     include: ['src/__tests__/**/*.test.ts'],
     globals: true,
+    setupFiles: ['src/__tests__/helpers/setup.ts'],
   },
 });

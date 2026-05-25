@@ -1,10 +1,11 @@
+import { env } from 'app/config/env.js';
 import { SESSION_COOKIE_NAME } from 'app/constants/session.js';
 import * as authRepo from 'app/repositories/auth/auth.js';
 import type { NextFunction, Request, Response } from 'express';
 
 // Sentry is optional; import lazily to avoid hard dependency when DSN not set
 async function setSentryUser(id: string, email: string): Promise<void> {
-  if (!process.env.SENTRY_DSN) return;
+  if (!env.SENTRY_DSN) return;
   try {
     const Sentry = await import('@sentry/node');
     Sentry.setUser({ email, id });
@@ -14,7 +15,7 @@ async function setSentryUser(id: string, email: string): Promise<void> {
 }
 
 async function clearSentryUser(): Promise<void> {
-  if (!process.env.SENTRY_DSN) return;
+  if (!env.SENTRY_DSN) return;
   try {
     const Sentry = await import('@sentry/node');
     Sentry.setUser(null);
