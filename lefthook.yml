@@ -60,7 +60,7 @@ pre-push:
     lint:
       run: pnpm lint
     test-server:
-      run: pnpm test:coverage
+      run: pnpm test
     test-web:
       run: pnpm --filter ./apps/client/web run test
     build:
