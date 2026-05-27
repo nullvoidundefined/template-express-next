@@ -33,7 +33,11 @@ export default defineConfig({
       },
     },
     environment: 'node',
-    exclude: [...configDefaults.exclude, 'migrations/**'],
+    exclude: [
+      ...configDefaults.exclude,
+      'migrations/**',
+      'src/__tests__/integration/**',
+    ],
     include: ['src/__tests__/**/*.test.ts'],
     globals: true,
     setupFiles: ['src/__tests__/helpers/setup.ts'],
