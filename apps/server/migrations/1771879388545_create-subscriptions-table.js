@@ -1,17 +1,15 @@
 /** @param {import('node-pg-migrate').MigrationBuilder} pgm */
 export const up = (pgm) => {
-  pgm.createType('subscription_status', {
-    values: [
-      'active',
-      'canceled',
-      'incomplete',
-      'incomplete_expired',
-      'past_due',
-      'paused',
-      'trialing',
-      'unpaid',
-    ],
-  });
+  pgm.createType('subscription_status', [
+    'active',
+    'canceled',
+    'incomplete',
+    'incomplete_expired',
+    'past_due',
+    'paused',
+    'trialing',
+    'unpaid',
+  ]);
 
   pgm.createTable('subscriptions', {
     cancel_at_period_end: { default: false, notNull: true, type: 'boolean' },
