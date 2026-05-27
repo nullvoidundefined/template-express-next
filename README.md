@@ -1,6 +1,6 @@
-# Doppelscript
+# Express + Next.js Boilerplate
 
-<!-- TODO -->
+Production-ready Express 5 + Next.js 15 monorepo template.
 
 ## Stack
 

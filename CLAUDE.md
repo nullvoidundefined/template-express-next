@@ -1,6 +1,6 @@
-# Doppelscript
+# Express + Next.js Boilerplate
 
-Express 5 + Next.js 15 monorepo for Doppelscript. This file is auto-loaded on every session and contains rules that apply to the whole repo. Workspace-specific conventions live next to the code they govern:
+Express 5 + Next.js 15 monorepo template. This file is auto-loaded on every session and contains rules that apply to the whole repo. Workspace-specific conventions live next to the code they govern:
 
 - `apps/client/web/CLAUDE.md` for frontend, styling, component patterns, TanStack Query, no-Tailwind, per-component folders, `displayName`, `data-test-id`, Railway deployment (auto-loaded when working in `apps/client/web/`)
 - `apps/client/CLAUDE.md` for shared React and TypeScript conventions across all client surfaces (auto-loaded when working in `apps/client/`)
@@ -38,7 +38,7 @@ These apply to the whole repo. Additional non-negotiables specific to each works
 17. **Environment validation at startup.** Every server calls `validateEnv()` before any middleware registration. A server that boots with missing env vars and fails on the first request is harder to debug than one that crashes immediately.
 18. **Health endpoints on every API service.** `/health` (liveness, always 200) and `/health/ready` (readiness, verifies DB connectivity). Register before all application routes.
 19. **`NODE_ENV` must always be explicitly set.** Every Railway service has `NODE_ENV=production`. Never leave it unset or defaulted.
-20. **SSL: never `rejectUnauthorized: false`.** Use the conditional pattern gated on `isProduction()`. This was left in Doppelscript for weeks and silently disabled certificate validation in production.
+20. **SSL: never `rejectUnauthorized: false`.** Use the conditional pattern gated on `isProduction()`. This was left in a prior project for weeks and silently disabled certificate validation in production.
 21. **CORS: never wildcard with credentials.** `CORS_ORIGIN` must be the exact stable Railway production URL. Never a preview or ephemeral URL.
 22. **CSRF: header-only pattern.** (Same as rule 6 -- also listed here for visibility.) The `csrfGuard` middleware enforces it on the server. No token endpoint.
 23. **Session cookies: correct `SameSite` and `Secure` flags.** `SameSite: 'lax'` when frontend and backend share the same Railway domain. `SameSite: 'none'` + `secure: true` only when running on separate domains. `httpOnly: true` always.

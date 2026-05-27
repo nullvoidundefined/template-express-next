@@ -29,7 +29,7 @@ function ComingSoonPage() {
             strokeWidth='6'
           />
         </svg>
-        <h1 className={styles.brand}>Doppelscript</h1>
+        <h1 className={styles.brand}>My App</h1>
         <p className={styles.tagline}>Coming soon.</p>
       </div>
     </main>
