@@ -1,0 +1,572 @@
+openapi: 3.1.0
+info:
+  title: Express + Next.js Boilerplate API
+  version: 1.0.0
+  description: >
+    Cookie-authenticated REST API. Application routes are versioned under /v1;
+    health checks live at the root. All errors use the { code, error } envelope.
+    State-changing requests require the X-Requested-With header (CSRF guard) and
+    may send an Idempotency-Key header for safe retries.
+
+servers:
+  - url: http://localhost:3001
+    description: Local development
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Posts
+  - name: Billing
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sid
+
+  parameters:
+    CsrfHeader:
+      name: X-Requested-With
+      in: header
+      required: true
+      description: Must be sent on every state-changing request (CSRF guard).
+      schema:
+        type: string
+        example: XMLHttpRequest
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: >
+        Opaque client-generated key. A repeated authenticated POST/PUT with the
+        same key replays the first stored response within 24 hours.
+      schema:
+        type: string
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, error]
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code clients switch on.
+          enum:
+            - AUTH_ADMIN_REQUIRED
+            - AUTH_EMAIL_ALREADY_REGISTERED
+            - AUTH_INVALID_CREDENTIALS
+            - AUTH_INVALID_RESET_TOKEN
+            - AUTH_REQUIRED
+            - AUTH_SESSION_EXPIRED
+            - AUTH_USER_NOT_FOUND
+            - BILLING_NO_ACCOUNT
+            - BILLING_WEBHOOK_INVALID_SIGNATURE
+            - BILLING_WEBHOOK_MISCONFIGURED
+            - BILLING_WEBHOOK_PROCESSING_FAILED
+            - CSRF_HEADER_MISSING
+            - INPUT_VALIDATION_ERROR
+            - POSTS_NOT_FOUND
+            - RATE_LIMIT_EXCEEDED
+            - ROUTING_NOT_FOUND
+            - SERVER_DATABASE_UNAVAILABLE
+            - SERVER_INTERNAL_ERROR
+            - SERVER_REQUEST_TIMEOUT
+        error:
+          type: string
+          description: Human-readable message for display.
+
+    User:
+      type: object
+      required: [id, email, role, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, user]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    UserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+
+    Post:
+      type: object
+      required: [id, user_id, title, body, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    PostEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          $ref: '#/components/schemas/Post'
+
+    PostList:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+        meta:
+          type: object
+          required: [limit, offset, total]
+          properties:
+            limit:
+              type: integer
+            offset:
+              type: integer
+            total:
+              type: integer
+
+    CreatePost:
+      type: object
+      required: [title, body]
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        body:
+          type: string
+          maxLength: 10000
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Request body failed validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe (always 200)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe (verifies DB connectivity)
+      responses:
+        '200':
+          description: Ready
+        '503':
+          description: Database unavailable
+
+  /v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user and start a session
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '201':
+          description: Created; sets the sid session cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in and start a session
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Logged in; sets the sid session cookie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out (always 204)
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Logged out; clears the sid cookie
+
+  /v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get the current user
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Auth]
+      summary: Update the current user (change password)
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                currentPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request a password-reset email (always 200)
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Always returns 200 to prevent user enumeration
+
+  /v1/auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset the password with a token
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '204':
+          description: Password reset; all sessions invalidated
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/posts:
+    get:
+      tags: [Posts]
+      summary: List the current user's posts (paginated)
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Page of posts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Posts]
+      summary: Create a post
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePost'
+      responses:
+        '201':
+          description: Created post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/posts/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Posts]
+      summary: Get one of the current user's posts
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Posts]
+      summary: Update one of the current user's posts
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePost'
+      responses:
+        '200':
+          description: Updated post
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PostEnvelope'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Posts]
+      summary: Delete one of the current user's posts
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/billing/checkout:
+    post:
+      tags: [Billing]
+      summary: Create a Stripe Checkout session
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [priceId]
+              properties:
+                priceId:
+                  type: string
+      responses:
+        '200':
+          description: Checkout session URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/billing/portal:
+    post:
+      tags: [Billing]
+      summary: Create a Stripe billing portal session
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '200':
+          description: Portal session URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+        '400':
+          description: No billing account found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'

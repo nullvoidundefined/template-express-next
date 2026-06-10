@@ -1,0 +1,26 @@
+.DS_Store
+.claude/
+node_modules
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+.next/
+
+# Coverage
+coverage/
+
+# Logs
+*.log
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Server local env
+server/.env
+.vercel

@@ -1,0 +1,42 @@
+.page {
+  align-items: center;
+  background: var(--background);
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+}
+
+.content {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.mascot {
+  height: 200px;
+  width: 200px;
+}
+
+.brand {
+  color: var(--foreground);
+  font-size: clamp(32px, 6vw, 56px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.tagline {
+  color: var(--foreground-muted);
+  font-size: 16px;
+  letter-spacing: 0.01em;
+  margin-top: -16px;
+}
+
+@media (max-width: 480px) {
+  .mascot {
+    height: 160px;
+    width: 160px;
+  }
+}

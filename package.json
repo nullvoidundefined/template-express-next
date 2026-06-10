@@ -1,0 +1,41 @@
+{
+  "name": "template-express-next",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel run dev",
+    "dev:payments": "pnpm dev & stripe listen --forward-to localhost:3001/webhooks/stripe",
+    "dev:watch": "./scripts/dev-watch.sh",
+    "dev:worker": "pnpm --filter ./apps/server run worker",
+    "build": "pnpm --filter ./apps/server build && pnpm --filter ./apps/client/web build",
+    "lint": "pnpm -r run lint",
+    "format": "prettier --write '*.{ts,mjs,yml,md}' 'e2e/**/*.ts' 'docs/**/*.md' && pnpm -r run format",
+    "format:check": "prettier --check '*.{ts,mjs,yml,md}' 'e2e/**/*.ts' 'docs/**/*.md' && pnpm -r run format:check",
+    "test": "pnpm --filter ./apps/server run test",
+    "test:coverage": "pnpm --filter ./apps/server run test:coverage",
+    "test:e2e": "lsof -ti:3000 -ti:3001 | xargs kill 2>/dev/null || true; PW_PRE_BUILT=true PW_REUSE_SERVER=false playwright test --project=chromium",
+    "test:e2e:full": "pnpm build && pnpm test:e2e",
+    "test:e2e:ui": "playwright test --ui",
+    "test:smoke": "playwright test --config=playwright.smoke.config.ts",
+    "seed:test-db": "pnpm --filter server run seed:test",
+    "storybook": "storybook dev -p 6006 -c apps/client/web/.storybook",
+    "storybook:build": "storybook build -c apps/client/web/.storybook",
+    "test:visual": "pnpm storybook:build && playwright test e2e/visual-regression/ --project=visual-regression",
+    "test:visual:update": "pnpm storybook:build && playwright test e2e/visual-regression/ --project=visual-regression --update-snapshots",
+    "prepare": "lefthook install || true"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0",
+    "@storybook/addon-a11y": "^8.6.18",
+    "@storybook/addon-essentials": "^8.6.14",
+    "@storybook/react-vite": "^8.6.18",
+    "@storybook/test": "^8.6.14",
+    "lefthook": "^2.1.1",
+    "prettier": "^3.5.3",
+    "storybook": "^8.6.18"
+  }
+}

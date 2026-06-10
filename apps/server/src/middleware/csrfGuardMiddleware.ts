@@ -1,0 +1,37 @@
+import {
+  ERROR_CODES,
+  createErrorResponse,
+} from 'app/constants/errorCodesConstants.js';
+import { HTTP } from 'app/constants/httpConstants.js';
+import type { NextFunction, Request, Response } from 'express';
+
+const STATE_CHANGING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
+
+/**
+ * Rejects state-changing requests that lack X-Requested-With.
+ * Reduces CSRF risk when using cookie-based sessions with credentials.
+ * Frontend must send X-Requested-With: XMLHttpRequest (or any value) on non-GET requests.
+ */
+export function csrfGuard(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (!STATE_CHANGING_METHODS.includes(req.method)) {
+    next();
+    return;
+  }
+  const value = req.get('X-Requested-With');
+  if (!value) {
+    res
+      .status(HTTP.STATUS.FORBIDDEN)
+      .json(
+        createErrorResponse(
+          ERROR_CODES.CSRF.HEADER_MISSING,
+          'Missing X-Requested-With header',
+        ),
+      );
+    return;
+  }
+  next();
+}

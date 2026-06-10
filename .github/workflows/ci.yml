@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Check formatting
+        run: pnpm run format:check
+
+      - name: Run tests with coverage
+        run: pnpm run test:coverage
+
+      - name: Run web tests
+        run: pnpm --filter ./apps/client/web run test
+
+      - name: Build
+        run: pnpm run build
+
+  e2e:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-retries 5
+          --health-timeout 5s
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: template_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-retries 5
+          --health-timeout 5s
+        ports:
+          - 5432:5432
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run migrations
+        run: pnpm --filter ./apps/server run migrate:up
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/template_test
+
+      - name: Seed test data
+        run: pnpm --filter ./apps/server run seed:test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/template_test
+          NODE_ENV: test
+          SESSION_SECRET: ci-test-secret-minimum-32-characters
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build server and web
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+
+      - name: Run E2E tests
+        run: pnpm run test:e2e
+        env:
+          CORS_ORIGIN: http://localhost:3000
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/template_test
+          NEXT_PUBLIC_API_URL: http://localhost:3001
+          NODE_ENV: test
+          REDIS_URL: redis://localhost:6379
+          SESSION_SECRET: ci-test-secret-minimum-32-characters
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Build production server image
+        run: docker build -t template-server:ci .
+
+      # The server imports @repo/constants at runtime from source. Resolve it
+      # from the server's working directory (where pnpm places the workspace
+      # symlink), matching how node apps/server/dist/index.js resolves it. This
+      # is the exact failure mode a build-only check misses.
+      - name: Verify workspace packages resolve at runtime
+        run: |
+          docker run --rm -w /app/apps/server template-server:ci \
+            node --input-type=module -e "
+              import('@repo/constants')
+                .then((m) => {
+                  if (!m.ANALYTICS_EVENTS) {
+                    console.error('ANALYTICS_EVENTS missing from @repo/constants');
+                    process.exit(1);
+                  }
+                  console.log('@repo/constants resolved at runtime');
+                })
+                .catch((err) => {
+                  console.error(err);
+                  process.exit(1);
+                });
+            "

@@ -1,0 +1,41 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: health_check_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/health_check_dev
+      - REDIS_URL=redis://redis:6379
+      - SESSION_SECRET=change-me-in-production
+      - NODE_ENV=development
+    ports:
+      - '3001:3001'
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./screenshots:/app/screenshots
+
+volumes:
+  postgres_data:
+  redis_data:

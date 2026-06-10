@@ -1,0 +1,9 @@
+build
+it out
+.next
+node_modules
+public
+*.css
+*.scss
+*.json
+src/gql/*
