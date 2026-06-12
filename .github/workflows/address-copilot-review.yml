@@ -1,0 +1,92 @@
+name: Address Copilot Review
+
+# Fires when Copilot submits a review. Reads every comment, applies fixes,
+# commits, pushes, and re-requests Copilot so the loop continues until approval.
+# Requires ANTHROPIC_API_KEY to be set as a repository secret.
+# Does not run on fork PRs (GITHUB_TOKEN cannot push to forks).
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  address-review:
+    name: Address Copilot review comments
+    if: |
+      github.event.review.user.login == 'copilot[bot]' &&
+      github.event.review.state != 'approved' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Configure git
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
+          git remote set-url origin \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Address review comments
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          claude --print --dangerously-skip-permissions "
+          PR #${PR_NUMBER} on ${REPO} has received a Copilot code review.
+
+          Step 1: Read the full review.
+            gh pr view ${PR_NUMBER} --json reviews,title,body
+
+          Step 2: Read all inline review comments.
+            gh api /repos/${REPO}/pulls/${PR_NUMBER}/comments
+
+          Step 3: Address every issue Copilot raised. The project CLAUDE.md conventions
+          are already loaded -- follow them. Do not modify test files unless the review
+          explicitly targets them. Do not open new PRs. Do not merge.
+
+          Step 4: Stage and commit the fixes.
+            git add <the specific files you changed>
+            git commit -m 'chore: address Copilot review on PR #${PR_NUMBER}'
+
+          Do not push. The workflow pushes after you commit.
+          If there is nothing to fix, do nothing."
+
+      - name: Push fixes
+        run: |
+          if git log --oneline origin/${{ github.event.pull_request.head.ref }}..HEAD | grep -q .; then
+            git push origin HEAD
+          else
+            echo "No new commits -- nothing to push."
+          fi
+
+      - name: Re-request Copilot review
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr edit ${{ github.event.pull_request.number }} --add-reviewer copilot
