@@ -1,7 +1,8 @@
 name: Address Copilot Review
 
-# Fires when Copilot submits a review. Reads every comment, applies fixes,
-# commits, pushes, and re-requests Copilot so the loop continues until approval.
+# Fires when Copilot submits a review. Claude fixes every comment, then loops:
+# push -> wait for CI -> if red, fix and push again -> until green.
+# Finally re-requests Copilot so the cycle continues until approval.
 # Requires ANTHROPIC_API_KEY to be set as a repository secret.
 # Does not run on fork PRs (GITHUB_TOKEN cannot push to forks).
 on:
@@ -10,12 +11,13 @@ on:
 
 jobs:
   address-review:
-    name: Address Copilot review comments
+    name: Address Copilot review and stabilize CI
     if: |
       github.event.review.user.login == 'copilot[bot]' &&
       github.event.review.state != 'approved' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
       pull-requests: write
@@ -50,43 +52,50 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Address review comments
+      - name: Fix review and stabilize CI
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
-          claude --print --dangerously-skip-permissions "
-          PR #${PR_NUMBER} on ${REPO} has received a Copilot code review.
+          claude --print --dangerously-skip-permissions "$(cat << PROMPT
+          You are an autonomous fixer for PR #${PR_NUMBER} (branch: ${BRANCH}) on ${REPO}.
 
-          Step 1: Read the full review.
-            gh pr view ${PR_NUMBER} --json reviews,title,body
+          PHASE 1 -- Fix the Copilot review:
+          1. Read the review:
+               gh pr view ${PR_NUMBER} --json reviews,title
+          2. Read all inline comments:
+               gh api /repos/${REPO}/pulls/${PR_NUMBER}/comments
+          3. Fix every issue. The project CLAUDE.md conventions are loaded -- follow them.
+             Do not modify test files unless the review explicitly targets them.
+             Do not open new PRs. Do not merge.
+          4. Commit and push:
+               git add <the specific files you changed>
+               git commit -m 'chore: address Copilot review on PR #${PR_NUMBER}'
+               git push origin HEAD
 
-          Step 2: Read all inline review comments.
-            gh api /repos/${REPO}/pulls/${PR_NUMBER}/comments
+          PHASE 2 -- Stabilize CI (loop until green, max 5 iterations):
+          After each push, wait for the triggered CI run and check its result:
+          a. Sleep 20s to let GitHub register the new run.
+          b. Get the latest run ID for this branch:
+               gh run list --branch ${BRANCH} --workflow CI --limit 1 --json databaseId --jq '.[0].databaseId'
+          c. Watch it to completion:
+               gh run watch <run-id> --exit-status
+          d. If exit code 0 (CI green): proceed to PHASE 3.
+          e. If exit code non-zero (CI red):
+             - Read the failure output:
+                 gh run view <run-id> --log-failed
+             - Identify the root cause. Fix it. Do not weaken or skip tests.
+             - Commit and push:
+                 git add <changed files>
+                 git commit -m 'fix: CI failure on PR #${PR_NUMBER}'
+                 git push origin HEAD
+             - Return to step (a).
+          After 5 failed iterations, stop and print a plain-text summary of what failed and why.
 
-          Step 3: Address every issue Copilot raised. The project CLAUDE.md conventions
-          are already loaded -- follow them. Do not modify test files unless the review
-          explicitly targets them. Do not open new PRs. Do not merge.
-
-          Step 4: Stage and commit the fixes.
-            git add <the specific files you changed>
-            git commit -m 'chore: address Copilot review on PR #${PR_NUMBER}'
-
-          Do not push. The workflow pushes after you commit.
-          If there is nothing to fix, do nothing."
-
-      - name: Push fixes
-        run: |
-          if git log --oneline origin/${{ github.event.pull_request.head.ref }}..HEAD | grep -q .; then
-            git push origin HEAD
-          else
-            echo "No new commits -- nothing to push."
-          fi
-
-      - name: Re-request Copilot review
-        if: success()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh pr edit ${{ github.event.pull_request.number }} --add-reviewer copilot
+          PHASE 3 -- Re-request Copilot review:
+          gh pr edit ${PR_NUMBER} --add-reviewer copilot
+          PROMPT
+          )"
