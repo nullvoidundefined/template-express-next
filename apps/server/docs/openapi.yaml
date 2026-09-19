@@ -72,6 +72,7 @@ components:
             - AUTH_SESSION_EXPIRED
             - AUTH_USER_NOT_FOUND
             - BILLING_NO_ACCOUNT
+            - BILLING_NOT_CONFIGURED
             - BILLING_WEBHOOK_INVALID_SIGNATURE
             - BILLING_WEBHOOK_MISCONFIGURED
             - BILLING_WEBHOOK_PROCESSING_FAILED
@@ -551,16 +552,18 @@ paths:
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
         - $ref: '#/components/parameters/IdempotencyKey'
+      description: >
+        Creates a Checkout session for the server's configured price
+        (STRIPE_PRICE_ID); the client never chooses the price. Stripe returns
+        the customer to /dashboard?checkout=success or ?checkout=canceled.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [priceId]
-              properties:
-                priceId:
-                  type: string
+              description: Must be empty; any field answers 400.
+              additionalProperties: false
       responses:
         '200':
           description: Checkout session URL
@@ -582,6 +585,14 @@ paths:
           $ref: '#/components/responses/IdempotencyRequestInProgress'
         '422':
           $ref: '#/components/responses/IdempotencyKeyReused'
+        '503':
+          description: >
+            Billing is not configured (no STRIPE_PRICE_ID); code
+            BILLING_NOT_CONFIGURED.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /v1/billing/portal:
     post:

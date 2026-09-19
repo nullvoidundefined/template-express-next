@@ -1,0 +1,16 @@
+.billingActions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 480px;
+}
+
+.buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.error {
+  color: var(--error, #b42318);
+  margin: 0;
+}

@@ -13,7 +13,6 @@ const ROUTE_MAP: Record<string, Access> = {
 };
 
 const PREFIX_RULES: Array<{ access: Access; prefix: string }> = [
-  { access: 'private', prefix: '/settings' },
   { access: 'admin', prefix: '/admin' },
 ];
 

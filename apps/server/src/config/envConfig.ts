@@ -21,6 +21,11 @@ const envSchema = z.object({
   RESEND_FROM_EMAIL: z.string().default('noreply@example.com'),
   SENTRY_DSN: z.string().optional(),
   SESSION_SECRET: z.string().min(1, 'SESSION_SECRET is required'),
+  // The one price checkout sells; chosen by the server, never by the client.
+  STRIPE_PRICE_ID: z
+    .string()
+    .regex(/^price_[A-Za-z0-9]+$/, 'STRIPE_PRICE_ID must look like price_...')
+    .optional(),
   STRIPE_PUBLISHABLE_KEY: z.string().optional(),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
