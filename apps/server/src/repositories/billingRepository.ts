@@ -16,7 +16,7 @@ interface BillingRepoDeps {
 // A 'processing' claim older than this belongs to a handler that died: a
 // healthy webhook handler finishes in seconds, so ten minutes leaves a wide
 // margin before a live claim could be taken over.
-const STRIPE_EVENT_CLAIM_STALE_SECONDS = 10 * 60;
+const STRIPE_EVENT_CLAIM_STALE_SECONDS = 600;
 
 const SUBSCRIPTION_COLUMNS = [
   'cancel_at_period_end',
