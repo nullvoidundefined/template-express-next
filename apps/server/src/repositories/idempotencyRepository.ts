@@ -44,6 +44,15 @@ interface IdempotencyKeyRow {
   status_code: number | null;
 }
 
+const IDEMPOTENCY_KEY_COLUMNS = [
+  'request_body_hash',
+  'request_method',
+  'request_path',
+  'response_body',
+  'status',
+  'status_code',
+].join(', ');
+
 const IDEMPOTENCY_TTL_HOURS = 24;
 
 function toStoredIdempotencyKey(row: IdempotencyKeyRow): StoredIdempotencyKey {
@@ -100,8 +109,7 @@ function createIdempotencyRepo({ query }: IdempotencyRepoDeps) {
     userId: string,
   ): Promise<StoredIdempotencyKey | null> {
     const result = await query<IdempotencyKeyRow>(
-      `SELECT request_body_hash, request_method, request_path, response_body,
-              status, status_code
+      `SELECT ${IDEMPOTENCY_KEY_COLUMNS}
        FROM idempotency_keys
        WHERE key = $1 AND user_id = $2`,
       [key, userId],

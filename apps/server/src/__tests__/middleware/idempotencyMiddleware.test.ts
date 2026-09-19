@@ -2,10 +2,11 @@ import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { createIdempotencyMiddleware } from 'app/middleware/idempotencyMiddleware.js';
 import type { IdempotencyRepo } from 'app/repositories/idempotencyRepository.js';
 import { hashToken } from 'app/services/hashService.js';
+import { logger } from 'app/services/loggerService.js';
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface ClaimInput {
   key: string;
@@ -31,10 +32,26 @@ interface Deferred {
 
 const userId = uuid();
 
+interface FakeIdempotencyRepo {
+  claimKey: (input: ClaimInput) => Promise<boolean>;
+  completeKey: (
+    key: string,
+    ownerId: string,
+    statusCode: number,
+    responseBody: unknown,
+  ) => Promise<void>;
+  findKey: (key: string, ownerId: string) => Promise<StoredKey | null>;
+  releaseKey: (key: string, ownerId: string) => Promise<void>;
+  rows: Map<string, StoredKey>;
+  seedKey: (key: string, row: StoredKey) => void;
+  storedKey: (key: string) => StoredKey | undefined;
+}
+
 // In-memory stand-in for the idempotency repository. It implements the spec's
 // claim semantics (a claim succeeds only when no row exists for key + user) so
 // the tests can assert on the stored rows the way they would on database rows.
-function createFakeIdempotencyRepo() {
+// Tests replace single methods to simulate slow or failing storage.
+function createFakeIdempotencyRepo(): FakeIdempotencyRepo {
   const rows = new Map<string, StoredKey>();
 
   function rowId(key: string, ownerId: string): string {
@@ -42,7 +59,7 @@ function createFakeIdempotencyRepo() {
   }
 
   return {
-    claimKey: vi.fn((input: ClaimInput): Promise<boolean> => {
+    claimKey(input: ClaimInput): Promise<boolean> {
       const id = rowId(input.key, input.userId);
       if (rows.has(id)) {
         return Promise.resolve(false);
@@ -56,37 +73,34 @@ function createFakeIdempotencyRepo() {
         statusCode: null,
       });
       return Promise.resolve(true);
-    }),
-    completeKey: vi.fn(
-      (
-        key: string,
-        ownerId: string,
-        statusCode: number,
-        responseBody: unknown,
-      ): Promise<void> => {
-        const existing = rows.get(rowId(key, ownerId));
-        if (existing) {
-          rows.set(rowId(key, ownerId), {
-            ...existing,
-            responseBody,
-            status: 'completed',
-            statusCode,
-          });
-        }
-        return Promise.resolve();
-      },
-    ),
-    findKey: vi.fn(
-      (key: string, ownerId: string): Promise<StoredKey | null> =>
-        Promise.resolve(rows.get(rowId(key, ownerId)) ?? null),
-    ),
-    releaseKey: vi.fn((key: string, ownerId: string): Promise<void> => {
+    },
+    completeKey(
+      key: string,
+      ownerId: string,
+      statusCode: number,
+      responseBody: unknown,
+    ): Promise<void> {
+      const existing = rows.get(rowId(key, ownerId));
+      if (existing?.status === 'in_progress') {
+        rows.set(rowId(key, ownerId), {
+          ...existing,
+          responseBody,
+          status: 'completed',
+          statusCode,
+        });
+      }
+      return Promise.resolve();
+    },
+    findKey(key: string, ownerId: string): Promise<StoredKey | null> {
+      return Promise.resolve(rows.get(rowId(key, ownerId)) ?? null);
+    },
+    releaseKey(key: string, ownerId: string): Promise<void> {
       const existing = rows.get(rowId(key, ownerId));
       if (existing?.status === 'in_progress') {
         rows.delete(rowId(key, ownerId));
       }
       return Promise.resolve();
-    }),
+    },
     rows,
     seedKey(key: string, row: StoredKey): void {
       rows.set(rowId(key, userId), row);
@@ -109,8 +123,12 @@ function hashBody(body: unknown): string {
   return hashToken(JSON.stringify(body ?? {}));
 }
 
+const REQUEST_ID = 'req-idempotency-test';
+const USER_EMAIL = 'user@example.com';
+
 let fakeRepo = createFakeIdempotencyRepo();
 let gate = createDeferred();
+let isClientGone = false;
 let runCounts: Record<string, number> = {};
 
 function countRun(route: string): number {
@@ -122,17 +140,59 @@ function runsOf(route: string): number {
   return runCounts[route] ?? 0;
 }
 
+// Mirrors the request timeout middleware in app.ts: on expiry it answers 408
+// through res.json, then destroys the request.
+function createTimeoutMiddleware(timeoutMs: number) {
+  return function requestTimeout(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): void {
+    res.setTimeout(timeoutMs, () => {
+      if (!res.headersSent) {
+        res.status(408).json({
+          code: 'SERVER_REQUEST_TIMEOUT',
+          error: 'Request timeout',
+        });
+      }
+      req.destroy();
+    });
+    next();
+  };
+}
+
+// Records whether the connection closed before the response finished, so a
+// test can wait until the server has seen the client disconnect.
+function trackClientDisconnect(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  res.on('close', () => {
+    if (!res.writableFinished) {
+      isClientGone = true;
+    }
+  });
+  next();
+}
+
 // Builds an app that optionally injects a user, mounts the middleware, and
 // registers handlers that count their own runs so each test can assert how many
-// times the handler actually executed.
-function buildApp(withUser: boolean) {
+// times the handler actually executed. A timeout, when given, is registered
+// before the idempotency middleware, as in app.ts.
+function buildApp(withUser: boolean, timeoutMs?: number) {
   const app = express();
   app.use(express.json());
+  if (timeoutMs !== undefined) {
+    app.use(createTimeoutMiddleware(timeoutMs));
+  }
+  app.use(trackClientDisconnect);
   if (withUser) {
     app.use((req, _res, next) => {
+      req.id = REQUEST_ID;
       req.user = {
         created_at: new Date('2025-01-01'),
-        email: 'user@example.com',
+        email: USER_EMAIL,
         id: userId,
         role: 'user',
         updated_at: null,
@@ -193,6 +253,20 @@ function buildApp(withUser: boolean) {
     await gate.promise;
     res.status(201).json({ data: { run } });
   });
+  // The first call outlives any request timeout; later calls answer at once.
+  app.post('/hang', async (_req: Request, res: Response) => {
+    const run = countRun('hang');
+    if (run === 1) {
+      await gate.promise;
+    }
+    if (!res.headersSent) {
+      res.status(201).json({ data: { run } });
+    }
+  });
+  app.post('/null-body', (_req: Request, res: Response) => {
+    countRun('null-body');
+    res.status(200).json(null);
+  });
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(500).json({ error: String(err) });
   });
@@ -217,7 +291,13 @@ describe('idempotency middleware', () => {
   beforeEach(() => {
     fakeRepo = createFakeIdempotencyRepo();
     gate = createDeferred();
+    isClientGone = false;
     runCounts = {};
+  });
+
+  afterEach(() => {
+    gate.resolve();
+    vi.restoreAllMocks();
   });
 
   describe('replay of a completed request (I-1)', () => {
@@ -655,6 +735,194 @@ describe('idempotency middleware', () => {
       expect(second.status).toBe(201);
       expect(runsOf('create')).toBe(2);
       expect(fakeRepo.rows.size).toBe(0);
+    });
+  });
+
+  describe('request timeout (I-10)', () => {
+    it('releases the claim after a 408 timeout so the retry runs the handler', async () => {
+      const app = buildApp(true, 50);
+      const payload = { n: 1 };
+
+      // The timeout either delivers the 408 or the destroyed socket hangs up.
+      const firstStatus = await request(app)
+        .post('/hang')
+        .set('Idempotency-Key', 'k-timeout')
+        .send(payload)
+        .then(
+          (res) => res.status,
+          () => null,
+        );
+      await waitForStatus('k-timeout', 'absent');
+      const retry = await request(app)
+        .post('/hang')
+        .set('Idempotency-Key', 'k-timeout')
+        .send(payload);
+
+      expect([408, null]).toContain(firstStatus);
+      expect(retry.status).toBe(201);
+      expect(retry.body).toEqual({ data: { run: 2 } });
+      expect(runsOf('hang')).toBe(2);
+    });
+  });
+
+  describe('client disconnect during the claim (I-11)', () => {
+    it('releases a claim that resolves after the client has gone', async () => {
+      const claimGate = createDeferred();
+      const { claimKey } = fakeRepo;
+      let isClaimWritten = false;
+      fakeRepo.claimKey = async (input: ClaimInput): Promise<boolean> => {
+        await claimGate.promise;
+        const isClaimed = await claimKey(input);
+        isClaimWritten = isClaimed;
+        return isClaimed;
+      };
+      const app = buildApp(true);
+
+      await expect(
+        request(app)
+          .post('/create')
+          .set('Idempotency-Key', 'k-late-claim')
+          .send({ n: 1 })
+          .timeout(50),
+      ).rejects.toThrow();
+      await vi.waitFor(() => {
+        expect(isClientGone).toBe(true);
+      });
+      claimGate.resolve();
+      await vi.waitFor(() => {
+        expect(isClaimWritten).toBe(true);
+      });
+
+      await waitForStatus('k-late-claim', 'absent');
+    });
+  });
+
+  describe('failure to store the response (I-12)', () => {
+    it('releases the claim so the retry runs the handler', async () => {
+      vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      fakeRepo.completeKey = () => Promise.reject(new Error('storage down'));
+      const app = buildApp(true);
+      const payload = { title: 'Unstored' };
+
+      const first = await request(app)
+        .post('/create')
+        .set('Idempotency-Key', 'k-store-fail')
+        .send(payload);
+      await waitForStatus('k-store-fail', 'absent');
+      const retry = await request(app)
+        .post('/create')
+        .set('Idempotency-Key', 'k-store-fail')
+        .send(payload);
+
+      expect(first.status).toBe(201);
+      expect(retry.status).toBe(201);
+      expect(runsOf('create')).toBe(2);
+    });
+
+    it('logs the settle failure with the key, user ID, and request ID, never the email', async () => {
+      const errorSpy = vi
+        .spyOn(logger, 'error')
+        .mockImplementation(() => undefined);
+      fakeRepo.completeKey = () => Promise.reject(new Error('storage down'));
+      const app = buildApp(true);
+
+      await request(app)
+        .post('/create')
+        .set('Idempotency-Key', 'k-store-log')
+        .send({ title: 'Logged' });
+
+      await vi.waitFor(() => {
+        const logged = JSON.stringify(errorSpy.mock.calls);
+        expect(logged).toContain('k-store-log');
+        expect(logged).toContain(userId);
+        expect(logged).toContain(REQUEST_ID);
+      });
+      expect(JSON.stringify(errorSpy.mock.calls)).not.toContain(USER_EMAIL);
+    });
+  });
+
+  describe('JSON null bodies (I-13)', () => {
+    it('replays a 200 JSON null body as JSON null', async () => {
+      const app = buildApp(true);
+      const payload = { n: 1 };
+
+      const first = await request(app)
+        .post('/null-body')
+        .set('Idempotency-Key', 'k-null')
+        .send(payload);
+      await waitForStatus('k-null', 'completed');
+      const second = await request(app)
+        .post('/null-body')
+        .set('Idempotency-Key', 'k-null')
+        .send(payload);
+
+      expect(first.text).toBe('null');
+      expect(second.status).toBe(200);
+      expect(second.headers['content-type']).toMatch(/application\/json/);
+      expect(second.text).toBe('null');
+      expect(runsOf('null-body')).toBe(1);
+    });
+  });
+
+  describe('row released between the claim and the read (I-15)', () => {
+    it('claims the key again and runs the handler', async () => {
+      const { claimKey } = fakeRepo;
+      let isFirstClaim = true;
+      fakeRepo.claimKey = (input: ClaimInput): Promise<boolean> => {
+        if (isFirstClaim) {
+          isFirstClaim = false;
+          return Promise.resolve(false);
+        }
+        return claimKey(input);
+      };
+      const app = buildApp(true);
+
+      const res = await request(app)
+        .post('/create')
+        .set('Idempotency-Key', 'k-vanished')
+        .send({ title: 'Vanished' });
+      await waitForStatus('k-vanished', 'completed');
+
+      expect(res.status).toBe(201);
+      expect(runsOf('create')).toBe(1);
+    });
+  });
+
+  describe('key length (I-16)', () => {
+    it('answers 400 for a key longer than the maximum, before any claim', async () => {
+      const { IDEMPOTENCY_KEY_MAX_LENGTH } =
+        await import('app/constants/idempotencyConstants.js');
+      const app = buildApp(true);
+
+      const res = await request(app)
+        .post('/create')
+        .set('Idempotency-Key', 'k'.repeat(IDEMPOTENCY_KEY_MAX_LENGTH + 1))
+        .send({ title: 'Long key' });
+
+      expect(IDEMPOTENCY_KEY_MAX_LENGTH).toBe(255);
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({
+        code: 'INPUT_VALIDATION_ERROR',
+        error: expect.any(String) as unknown,
+      });
+      expect(runsOf('create')).toBe(0);
+      expect(fakeRepo.rows.size).toBe(0);
+    });
+
+    it('accepts a key of exactly the maximum length', async () => {
+      const { IDEMPOTENCY_KEY_MAX_LENGTH } =
+        await import('app/constants/idempotencyConstants.js');
+      const longestKey = 'k'.repeat(IDEMPOTENCY_KEY_MAX_LENGTH);
+      const app = buildApp(true);
+
+      const res = await request(app)
+        .post('/create')
+        .set('Idempotency-Key', longestKey)
+        .send({ title: 'Longest key' });
+      await waitForStatus(longestKey, 'completed');
+
+      expect(res.status).toBe(201);
+      expect(runsOf('create')).toBe(1);
     });
   });
 });

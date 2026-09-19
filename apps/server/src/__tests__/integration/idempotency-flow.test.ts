@@ -5,6 +5,7 @@
 import { query, withTransaction } from 'app/database/databasePool.js';
 import { createIdempotencyMiddleware } from 'app/middleware/idempotencyMiddleware.js';
 import { createIdempotencyRepo } from 'app/repositories/idempotencyRepository.js';
+import type { IdempotencyRepo } from 'app/repositories/idempotencyRepository.js';
 import type { User } from 'app/schemas/authSchema.js';
 import express from 'express';
 import type { Request, Response } from 'express';
@@ -16,6 +17,7 @@ interface Deferred {
   resolve: () => void;
 }
 
+const COMPLETION_DELAY_MS = 25;
 const DB_AVAILABLE = !!process.env.DATABASE_URL;
 
 let currentUser: User | undefined;
@@ -40,19 +42,15 @@ function runsOf(route: string): number {
 }
 
 // Minimal app: a user injected from a real users row, the middleware bound to
-// the real repository, and routes whose outcomes each test controls.
-function buildApp() {
+// the given repository, and routes whose outcomes each test controls.
+function buildApp(idempotencyRepo: IdempotencyRepo) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
     req.user = currentUser;
     next();
   });
-  app.use(
-    createIdempotencyMiddleware(
-      createIdempotencyRepo({ query, withTransaction }),
-    ),
-  );
+  app.use(createIdempotencyMiddleware(idempotencyRepo));
   app.post('/create', (req: Request, res: Response) => {
     const run = countRun('create');
     res.status(201).json({ data: { body: req.body as unknown, run } });
@@ -82,6 +80,10 @@ function buildApp() {
     countRun('empty');
     res.status(204).end();
   });
+  app.post('/null-body', (_req: Request, res: Response) => {
+    countRun('null-body');
+    res.status(200).json(null);
+  });
   app.post('/invalid', (_req: Request, res: Response) => {
     const run = countRun('invalid');
     res.status(400).json({ error: `invalid input ${String(run)}` });
@@ -89,7 +91,24 @@ function buildApp() {
   return app;
 }
 
-const testApp = buildApp();
+const idempotencyRepo = createIdempotencyRepo({ query, withTransaction });
+const testApp = buildApp(idempotencyRepo);
+
+// The same real repository with a slower completion write, standing in for a
+// loaded database, so a completion that lands after the response is flushed
+// leaves a window in which an immediate retry sees the claim in progress.
+const slowCompletionApp = buildApp({
+  ...idempotencyRepo,
+  async completeKey(
+    key: string,
+    userId: string,
+    statusCode: number,
+    responseBody: unknown,
+  ): Promise<void> {
+    await new Promise((settle) => setTimeout(settle, COMPLETION_DELAY_MS));
+    await idempotencyRepo.completeKey(key, userId, statusCode, responseBody);
+  },
+});
 
 async function insertUser(): Promise<User> {
   const email = `idem-${String(Date.now())}-${String(Math.round(Math.random() * 1e6))}@example.com`;
@@ -319,6 +338,43 @@ describe.skipIf(!DB_AVAILABLE)('idempotency integration', () => {
     expect(second.status).toBe(400);
     expect(second.body).toEqual({ error: 'invalid input 1' });
     expect(runsOf('invalid')).toBe(1);
+  });
+
+  it('replays a retry sent the moment the first response arrives (I-14)', async () => {
+    // Repeated so a completion that lands after the response is flushed shows
+    // up as a 409 on at least one attempt.
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      runCounts = {};
+      const key = `key-immediate-${String(attempt)}`;
+      const payload = { attempt };
+      const send = () =>
+        request(slowCompletionApp)
+          .post('/create')
+          .set('Idempotency-Key', key)
+          .send(payload);
+
+      const first = await send();
+      const retry = await send();
+
+      expect(first.status).toBe(201);
+      expect(retry.status).toBe(201);
+      expect(retry.body).toEqual(first.body);
+      expect(runsOf('create')).toBe(1);
+    }
+  });
+
+  it('replays a 200 JSON null body as JSON null (I-13)', async () => {
+    const payload = { n: 1 };
+
+    const first = await post('/null-body', 'key-null', payload);
+    await waitForKeyStatus('key-null', 'completed');
+    const second = await post('/null-body', 'key-null', payload);
+
+    expect(first.text).toBe('null');
+    expect(second.status).toBe(200);
+    expect(second.headers['content-type']).toMatch(/application\/json/);
+    expect(second.text).toBe('null');
+    expect(runsOf('null-body')).toBe(1);
   });
 
   it('does not deduplicate when no Idempotency-Key is sent (I-9)', async () => {

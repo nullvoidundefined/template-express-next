@@ -27,7 +27,13 @@ export const up = (pgm) => {
 
 /** @param pgm {import('node-pg-migrate').MigrationBuilder} */
 export const down = (pgm) => {
-  pgm.sql(`DELETE FROM idempotency_keys WHERE status = 'in_progress'`);
+  // Rows that cannot satisfy the restored NOT NULL constraints (claims still in
+  // progress, and completed responses with no body such as a 204) are deleted
+  // first; losing them only means those keys are no longer deduplicated.
+  pgm.sql(`
+    DELETE FROM idempotency_keys
+    WHERE status = 'in_progress' OR status_code IS NULL OR response_body IS NULL
+  `);
   pgm.alterColumn('idempotency_keys', 'response_body', { notNull: true });
   pgm.alterColumn('idempotency_keys', 'status_code', { notNull: true });
   pgm.dropColumns('idempotency_keys', [
