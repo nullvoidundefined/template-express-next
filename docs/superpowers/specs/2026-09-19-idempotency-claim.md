@@ -45,6 +45,19 @@ Error bodies use the existing `{ code, error }` envelope built with `createError
 - **I-8**: A completed 204 response is replayed as 204 with an empty body.
 - **I-9**: Requests without the header, without a user, or with another method are untouched, as today.
 
+Added after the pre-merge review (numbers stay stable):
+
+- **I-10**: A request ended by the 30-second request timeout (408 `SERVER_REQUEST_TIMEOUT` from the timeout middleware in `app.ts`, which then destroys the request) releases its claim like a 5xx, so the client's retry runs the handler again instead of replaying the 408.
+- **I-11**: A client that disconnects while the claim is still being written still has the claim released once the claim resolves, so the key does not stay `in_progress`.
+- **I-12**: When storing the completed response fails, the middleware releases the claim instead, and every settle failure is logged with the key, the user ID, and the request ID (`req.id`), never the email.
+- **I-13**: A 2xx response whose JSON body is `null` is replayed as JSON `null`, not as an empty body; the middleware tracks whether a JSON body was sent separately from its value.
+- **I-14**: A retry sent immediately after the first response arrives, with no wait, is replayed (the claim is completed before the response is flushed), never answered 409.
+- **I-15**: When the row holding the key disappears between a failed claim and the read (a failing request released it), the middleware claims the key again once instead of answering 409.
+- **I-16**: An `Idempotency-Key` longer than 255 characters answers 400 `INPUT_VALIDATION_ERROR` before any claim.
+- **I-17**: The down migration succeeds on a table holding completed 204 rows (null `response_body`): rows that cannot satisfy the restored `NOT NULL` constraints are deleted first.
+
+Accepted without change: a row stored before this migration has no fingerprint (null method, path, and hash) and matches any request for the rest of its 24-hour life. The template has no deployment carrying such rows.
+
 ## Interface
 
 These names are fixed so tests can be written before the implementation.
@@ -58,6 +71,7 @@ These names are fixed so tests can be written before the implementation.
   - `completeKey(key: string, userId: string, statusCode: number, responseBody: unknown): Promise<void>`.
   - `releaseKey(key: string, userId: string): Promise<void>`: deletes the row only while it is `in_progress`.
 - `createIdempotencyMiddleware(idempotencyRepo)` from `app/middleware/idempotencyMiddleware.js` keeps its signature.
+- `IDEMPOTENCY_KEY_MAX_LENGTH = 255` is exported from `app/constants/idempotencyConstants.js`.
 
 ## Tests
 
