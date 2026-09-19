@@ -1,3 +1,8 @@
+/**
+ * Request rate limiting: the global and auth limiters mounted by the app, and
+ * the createRateLimiter factory both are built from, which lets tests build a
+ * limiter with the shipped configuration and a small limit.
+ */
 import { redisRateLimiter } from 'app/clients/redisClient.js';
 import { isTest } from 'app/config/envConfig.js';
 import {
@@ -5,8 +10,12 @@ import {
   createErrorResponse,
 } from 'app/constants/errorCodesConstants.js';
 import { logger } from 'app/services/loggerService.js';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
+
+const AUTH_RATE_LIMIT_MAX = 10;
+const GLOBAL_RATE_LIMIT_MAX = 100;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
 // Sent as the 429 body so throttled clients get the same { code, error }
 // envelope as every other error response.
@@ -14,6 +23,12 @@ const rateLimitResponse = createErrorResponse(
   ERROR_CODES.RATE_LIMIT.EXCEEDED,
   'Too many requests, please try again later.',
 );
+
+interface RateLimiterOptions {
+  max: number;
+  prefix: string;
+  shouldSkip?: () => boolean;
+}
 
 if (!redisRateLimiter) {
   logger.warn(
@@ -31,23 +46,42 @@ function getStore(prefix: string): RedisStore | undefined {
   });
 }
 
-export const rateLimiter = rateLimit({
-  legacyHeaders: false,
-  max: 100,
-  message: rateLimitResponse,
-  skip: () => isTest,
-  standardHeaders: true,
-  store: getStore('global'),
-  windowMs: 15 * 60 * 1000,
+/**
+ * Builds a limiter with the shipped configuration. Skips under NODE_ENV=test
+ * by default so route tests are not throttled; tests that prove the limit
+ * pass `shouldSkip: () => false` and a small `max`.
+ */
+function createRateLimiter({
+  max,
+  prefix,
+  shouldSkip = () => isTest,
+}: RateLimiterOptions): RateLimitRequestHandler {
+  return rateLimit({
+    legacyHeaders: false,
+    max,
+    message: rateLimitResponse,
+    skip: shouldSkip,
+    standardHeaders: true,
+    store: getStore(prefix),
+    windowMs: RATE_LIMIT_WINDOW_MS,
+  });
+}
+
+const rateLimiter = createRateLimiter({
+  max: GLOBAL_RATE_LIMIT_MAX,
+  prefix: 'global',
 });
 
 /** Stricter limit for auth routes to resist credential stuffing. */
-export const authRateLimiter = rateLimit({
-  legacyHeaders: false,
-  max: 10,
-  message: rateLimitResponse,
-  skip: () => isTest,
-  standardHeaders: true,
-  store: getStore('auth'),
-  windowMs: 15 * 60 * 1000,
+const authRateLimiter = createRateLimiter({
+  max: AUTH_RATE_LIMIT_MAX,
+  prefix: 'auth',
 });
+
+export {
+  AUTH_RATE_LIMIT_MAX,
+  GLOBAL_RATE_LIMIT_MAX,
+  authRateLimiter,
+  createRateLimiter,
+  rateLimiter,
+};
