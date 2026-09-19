@@ -56,6 +56,13 @@ Added after the pre-merge review (numbers stay stable):
 - **I-16**: An `Idempotency-Key` longer than 255 characters answers 400 `INPUT_VALIDATION_ERROR` before any claim.
 - **I-17**: The down migration succeeds on a table holding completed 204 rows (null `response_body`): rows that cannot satisfy the restored `NOT NULL` constraints are deleted first.
 
+Added after the second review round:
+
+- **I-18**: A response sent without a JSON body (a 2xx ended with `res.end()`, or `res.send` with a text body) is replayed with the same status and an empty body, never as JSON `null`; a response whose JSON body is `null` still replays as JSON `null` (I-13). Whether a JSON body was sent is stored with the claim (`has_json_body`), because a nullable `jsonb` column cannot tell SQL NULL from JSON `null` once read back. Text bodies themselves are not stored.
+- **I-19**: I-14 holds for every response, not only JSON ones: a retry sent the moment a 204 (or any `res.end()` response) arrives is replayed, never answered 409. The claim is settled before any response is flushed, whether it is sent through `res.json` or `res.end`.
+- **I-20**: When the request timeout fires while a completed response is still held for its claim to settle, the client receives the 408, and the claim completes with the handler's own status and body, so the client's retry replays the handler's result. This is the one place a held response and the client's answer differ, and it is intended: the handler did run to completion.
+- **I-10 (tightened)**: the first response in the timeout case is the 408 `SERVER_REQUEST_TIMEOUT` envelope; a socket hang-up does not satisfy the test.
+
 Accepted without change: a row stored before this migration has no fingerprint (null method, path, and hash) and matches any request for the rest of its 24-hour life. The template has no deployment carrying such rows.
 
 ## Interface
@@ -72,6 +79,7 @@ These names are fixed so tests can be written before the implementation.
   - `releaseKey(key: string, userId: string): Promise<void>`: deletes the row only while it is `in_progress`.
 - `createIdempotencyMiddleware(idempotencyRepo)` from `app/middleware/idempotencyMiddleware.js` keeps its signature.
 - `IDEMPOTENCY_KEY_MAX_LENGTH = 255` is exported from `app/constants/idempotencyConstants.js`.
+- For I-18, the same migration also adds `has_json_body boolean NOT NULL`, backfilled `true` for rows that existed before it (they were all JSON responses) and defaulting to `false` afterwards. `StoredIdempotencyKey` gains `hasJsonBody: boolean`, and `completeKey` gains a fifth parameter: `completeKey(key, userId, statusCode, responseBody, hasJsonBody: boolean)`. A JSON `null` body is stored as the JSON value `null` (not SQL NULL); a response without a JSON body stores SQL NULL with `has_json_body = false`.
 
 ## Tests
 
