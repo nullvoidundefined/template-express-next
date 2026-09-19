@@ -31,6 +31,12 @@ const ERROR_CODES = {
     // State-changing request missing the X-Requested-With header
     HEADER_MISSING: 'CSRF_HEADER_MISSING',
   },
+  IDEMPOTENCY: {
+    // Idempotency-Key reused for a different method, path, or request body
+    KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+    // Idempotency-Key retried while the first request is still running
+    REQUEST_IN_PROGRESS: 'IDEMPOTENCY_REQUEST_IN_PROGRESS',
+  },
   INPUT: {
     // Zod schema validation failed on request body, params, or query
     VALIDATION_ERROR: 'INPUT_VALIDATION_ERROR',
