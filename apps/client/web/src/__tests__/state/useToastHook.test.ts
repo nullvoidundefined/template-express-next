@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { useToastStore } from '../../state/useToast';
+import { useToastStore } from '../../state/useToastHook';
 
 describe('useToastStore', () => {
   afterEach(() => {
