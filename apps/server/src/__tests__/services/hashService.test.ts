@@ -1,5 +1,6 @@
-import { hashToken } from 'app/services/hashService.js';
 import { describe, expect, it } from 'vitest';
+
+import { hashToken } from 'app/services/hashService.js';
 
 describe('hashToken', () => {
   it('returns the SHA-256 hex digest of the input', () => {

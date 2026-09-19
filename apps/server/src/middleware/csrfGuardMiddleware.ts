@@ -1,9 +1,10 @@
+import type { NextFunction, Request, Response } from 'express';
+
 import {
   ERROR_CODES,
   createErrorResponse,
 } from 'app/constants/errorCodesConstants.js';
 import { HTTP } from 'app/constants/httpConstants.js';
-import type { NextFunction, Request, Response } from 'express';
 
 const STATE_CHANGING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 

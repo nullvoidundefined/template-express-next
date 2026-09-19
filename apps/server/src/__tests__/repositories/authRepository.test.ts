@@ -1,11 +1,13 @@
+import crypto from 'node:crypto';
+
+import bcrypt from 'bcrypt';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { mockResult } from 'app/__tests__/helpers/mockResult.js';
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import type { PoolClient } from 'app/database/databasePool.js';
 import { createAuthRepo } from 'app/repositories/authRepository.js';
 import type { AuthRepoDeps } from 'app/repositories/authRepository.js';
-import bcrypt from 'bcrypt';
-import crypto from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('bcrypt', () => ({
   default: {

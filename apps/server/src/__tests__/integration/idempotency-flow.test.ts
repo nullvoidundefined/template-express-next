@@ -2,15 +2,16 @@
 // runs, replays completed responses, releases failed claims, and binds a key to
 // one request fingerprint, against the real database. Schema migration,
 // TRUNCATE between tests, and pool teardown live in setup.ts.
+import express from 'express';
+import type { Request, Response } from 'express';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { query, withTransaction } from 'app/database/databasePool.js';
 import { createIdempotencyMiddleware } from 'app/middleware/idempotencyMiddleware.js';
 import { createIdempotencyRepo } from 'app/repositories/idempotencyRepository.js';
 import type { IdempotencyRepo } from 'app/repositories/idempotencyRepository.js';
 import type { User } from 'app/schemas/authSchema.js';
-import express from 'express';
-import type { Request, Response } from 'express';
-import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface Deferred {
   promise: Promise<void>;

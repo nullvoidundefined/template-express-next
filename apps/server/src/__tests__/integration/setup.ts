@@ -2,9 +2,11 @@
 // vitest.integration.config.ts). Ensures the schema is migrated once per file,
 // truncates every application table between tests for isolation, and closes the
 // pool when the file finishes. Test files no longer manage their own cleanup.
-import { pool } from 'app/database/databasePool.js';
 import { execSync } from 'node:child_process';
+
 import { afterAll, beforeAll, beforeEach } from 'vitest';
+
+import { pool } from 'app/database/databasePool.js';
 
 const APP_TABLES =
   'idempotency_keys, posts, password_resets, sessions, stripe_events, subscriptions, users';

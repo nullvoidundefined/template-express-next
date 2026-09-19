@@ -10,6 +10,8 @@
  * moment it receives the answer always finds the settled row. Other requests
  * pass through untouched.
  */
+import type { NextFunction, Request, Response } from 'express';
+
 import {
   ERROR_CODES,
   createErrorResponse,
@@ -22,7 +24,6 @@ import type {
 } from 'app/repositories/idempotencyRepository.js';
 import { hashToken } from 'app/services/hashService.js';
 import { logger } from 'app/services/loggerService.js';
-import type { NextFunction, Request, Response } from 'express';
 
 const REPLAYABLE_METHODS = ['POST', 'PUT'];
 

@@ -1,7 +1,8 @@
-import { csrfGuard } from 'app/middleware/csrfGuardMiddleware.js';
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
+
+import { csrfGuard } from 'app/middleware/csrfGuardMiddleware.js';
 
 const app = express();
 app.use(express.json());

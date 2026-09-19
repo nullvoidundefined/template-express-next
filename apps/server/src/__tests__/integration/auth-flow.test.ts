@@ -1,10 +1,11 @@
 // Build the real app via the factory (no listener) so the integration test
 // exercises the production wiring -- CSRF, loadSession, auth routes -- against
 // a real database.
-import { createApp } from 'app/app.js';
-import { query, withTransaction } from 'app/database/databasePool.js';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
+
+import { createApp } from 'app/app.js';
+import { query, withTransaction } from 'app/database/databasePool.js';
 
 const { app: testApp } = createApp({ query, withTransaction });
 

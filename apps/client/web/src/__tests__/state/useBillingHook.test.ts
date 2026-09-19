@@ -1,13 +1,14 @@
 import { createElement } from 'react';
 import type { ReactNode } from 'react';
 
-import type * as ApiServiceModule from '@/services/apiService';
-import { ApiError, api } from '@/services/apiService';
-import { useBilling } from '@/state/useBillingHook';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+
+import type * as ApiServiceModule from '@/services/apiService';
+import { ApiError, api } from '@/services/apiService';
+import { useBilling } from '@/state/useBillingHook';
 
 // Only the network call is replaced; ApiError stays real so the hook can be
 // checked for rejecting with the error the API service throws.

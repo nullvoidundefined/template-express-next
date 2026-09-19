@@ -1,10 +1,11 @@
+import type { QueryResult, QueryResultRow } from 'pg';
+
 import type { PoolClient } from 'app/database/databasePool.js';
 import type {
   CreatePostInput,
   Post,
   UpdatePostInput,
 } from 'app/schemas/postsSchema.js';
-import type { QueryResult, QueryResultRow } from 'pg';
 
 /**
  * Data-access dependencies injected so repo tests can supply a fake `query`

@@ -1,9 +1,10 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { mockResult } from 'app/__tests__/helpers/mockResult.js';
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { createPostsRepo } from 'app/repositories/postsRepository.js';
 import type { PostsRepoDeps } from 'app/repositories/postsRepository.js';
 import type { Post } from 'app/schemas/postsSchema.js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockQuery = vi.fn();
 const repo = createPostsRepo({ query: mockQuery } as unknown as PostsRepoDeps);

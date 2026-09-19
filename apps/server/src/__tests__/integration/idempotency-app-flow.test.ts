@@ -6,10 +6,11 @@
 // behaves the same way on the real /v1/posts routes. Retries are sent the
 // moment the first response arrives, as a real client would. Schema migration,
 // TRUNCATE between tests, and pool teardown live in setup.ts.
-import { createApp } from 'app/app.js';
-import { query, withTransaction } from 'app/database/databasePool.js';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
+
+import { createApp } from 'app/app.js';
+import { query, withTransaction } from 'app/database/databasePool.js';
 
 interface ErrorBody {
   code: string;

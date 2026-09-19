@@ -1,5 +1,6 @@
-import { assertValidKey } from 'app/clients/r2Client.js';
 import { describe, expect, it } from 'vitest';
+
+import { assertValidKey } from 'app/clients/r2Client.js';
 
 describe('r2', () => {
   describe('assertValidKey', () => {

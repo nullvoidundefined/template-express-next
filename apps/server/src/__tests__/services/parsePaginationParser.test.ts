@@ -1,5 +1,6 @@
-import { parsePagination } from 'app/services/parsePaginationParser.js';
 import { describe, expect, it } from 'vitest';
+
+import { parsePagination } from 'app/services/parsePaginationParser.js';
 
 describe('parsePagination', () => {
   it('returns default limit and offset when both undefined', () => {

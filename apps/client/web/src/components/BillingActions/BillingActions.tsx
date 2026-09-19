@@ -15,6 +15,12 @@ import { useBilling } from '@/state/useBillingHook';
 
 import styles from './BillingActions.module.scss';
 
+const {
+  billingActions: billingActionsClassName,
+  buttons: buttonsClassName,
+  error: errorClassName,
+} = styles;
+
 const GENERIC_ERROR_MESSAGE = 'Something went wrong. Please try again.';
 const NO_ACCOUNT_ERROR_MESSAGE =
   "You don't have a billing account yet. Upgrade to create one.";
@@ -75,10 +81,10 @@ function BillingActions() {
   return (
     <section
       aria-label='Billing'
-      className={styles.billingActions}
+      className={billingActionsClassName}
       data-test-id='billing-actions'
     >
-      <div className={styles.buttons}>
+      <div className={buttonsClassName}>
         <Button
           disabled={isBusy}
           onClick={() => void handleRedirectToStripe('checkout', startCheckout)}
@@ -96,7 +102,7 @@ function BillingActions() {
         </Button>
       </div>
       {errorMessage && (
-        <p className={styles.error} ref={alertRef} role='alert' tabIndex={-1}>
+        <p className={errorClassName} ref={alertRef} role='alert' tabIndex={-1}>
           {errorMessage}
         </p>
       )}

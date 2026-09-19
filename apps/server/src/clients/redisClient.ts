@@ -1,6 +1,7 @@
+import { Redis } from 'ioredis';
+
 import { env } from 'app/config/envConfig.js';
 import { logger } from 'app/services/loggerService.js';
-import { Redis } from 'ioredis';
 
 let redis: Redis | null = null;
 let redisRateLimiter: Redis | null = null;

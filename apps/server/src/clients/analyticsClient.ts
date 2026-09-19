@@ -1,7 +1,8 @@
 import { ANALYTICS_EVENTS } from '@repo/constants';
+import { PostHog } from 'posthog-node';
+
 import { env } from 'app/config/envConfig.js';
 import { logger } from 'app/services/loggerService.js';
-import { PostHog } from 'posthog-node';
 
 export type { AnalyticsEvent } from '@repo/constants';
 export { ANALYTICS_EVENTS };

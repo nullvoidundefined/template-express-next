@@ -1,5 +1,6 @@
-import { mockLogger } from 'app/__tests__/helpers/mockLogger.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { mockLogger } from 'app/__tests__/helpers/mockLogger.js';
 
 describe('mockLogger', () => {
   afterEach(() => {

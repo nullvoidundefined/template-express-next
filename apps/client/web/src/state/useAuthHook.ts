@@ -1,10 +1,11 @@
 'use client';
 
-import { api } from '@/services/apiService';
 import type { User } from '@repo/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import posthog from 'posthog-js';
 import { z } from 'zod';
+
+import { api } from '@/services/apiService';
 
 export type { User };
 

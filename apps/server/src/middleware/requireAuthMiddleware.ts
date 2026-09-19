@@ -1,3 +1,5 @@
+import type { NextFunction, Request, Response } from 'express';
+
 import { env } from 'app/config/envConfig.js';
 import {
   ERROR_CODES,
@@ -6,7 +8,6 @@ import {
 import { HTTP } from 'app/constants/httpConstants.js';
 import { SESSION_COOKIE_NAME } from 'app/constants/sessionConstants.js';
 import type { AuthRepo } from 'app/repositories/authRepository.js';
-import type { NextFunction, Request, Response } from 'express';
 
 // Sentry is optional; import lazily to avoid hard dependency when DSN not set
 async function setSentryUser(id: string, email: string): Promise<void> {

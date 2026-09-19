@@ -1,6 +1,7 @@
-import { BillingStatusBanner } from '@/components/BillingStatusBanner/BillingStatusBanner';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+
+import { BillingStatusBanner } from '@/components/BillingStatusBanner/BillingStatusBanner';
 
 describe('BillingStatusBanner', () => {
   it('announces a completed checkout (C-5)', () => {

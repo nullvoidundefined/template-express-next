@@ -4,14 +4,15 @@
  * createCheckoutSchema), and Stripe sends the customer back to the dashboard
  * with the checkout outcome in the query string.
  */
+import type { Request, Response } from 'express';
+import type Stripe from 'stripe';
+
 import { env } from 'app/config/envConfig.js';
 import {
   ERROR_CODES,
   createErrorResponse,
 } from 'app/constants/errorCodesConstants.js';
 import { HTTP } from 'app/constants/httpConstants.js';
-import type { Request, Response } from 'express';
-import type Stripe from 'stripe';
 
 interface CheckoutHandlerDeps {
   getStripe: () => Stripe;

@@ -1,12 +1,13 @@
+import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
+import request from 'supertest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { createIdempotencyMiddleware } from 'app/middleware/idempotencyMiddleware.js';
 import type { IdempotencyRepo } from 'app/repositories/idempotencyRepository.js';
 import { hashToken } from 'app/services/hashService.js';
 import { logger } from 'app/services/loggerService.js';
-import express from 'express';
-import type { NextFunction, Request, Response } from 'express';
-import request from 'supertest';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface ClaimInput {
   key: string;

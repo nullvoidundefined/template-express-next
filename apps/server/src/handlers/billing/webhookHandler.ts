@@ -1,3 +1,6 @@
+import type { Request, Response } from 'express';
+import type Stripe from 'stripe';
+
 import { env } from 'app/config/envConfig.js';
 import {
   ERROR_CODES,
@@ -7,8 +10,6 @@ import { HTTP } from 'app/constants/httpConstants.js';
 import type { BillingRepo } from 'app/repositories/billingRepository.js';
 import type { BillingService } from 'app/services/billingService.js';
 import { logger } from 'app/services/loggerService.js';
-import type { Request, Response } from 'express';
-import type Stripe from 'stripe';
 
 interface WebhookHandlerDeps {
   billingRepo: Pick<

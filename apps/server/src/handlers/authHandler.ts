@@ -1,3 +1,8 @@
+import crypto from 'node:crypto';
+
+import bcrypt from 'bcrypt';
+import type { Request, Response } from 'express';
+
 import { ANALYTICS_EVENTS } from 'app/clients/analyticsClient.js';
 import { env, isDeployed } from 'app/config/envConfig.js';
 import { SALT_ROUNDS } from 'app/constants/authConstants.js';
@@ -22,9 +27,6 @@ import type {
 } from 'app/schemas/authSchema.js';
 import { hashToken } from 'app/services/hashService.js';
 import { logger } from 'app/services/loggerService.js';
-import bcrypt from 'bcrypt';
-import type { Request, Response } from 'express';
-import crypto from 'node:crypto';
 
 /**
  * Side-effecting dependencies injected so handler tests can supply fakes

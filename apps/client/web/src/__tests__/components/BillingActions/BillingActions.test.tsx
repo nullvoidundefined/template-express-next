@@ -1,5 +1,3 @@
-import { BillingActions } from '@/components/BillingActions/BillingActions';
-import { ApiError } from '@/services/apiService';
 import {
   act,
   fireEvent,
@@ -9,6 +7,9 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { BillingActions } from '@/components/BillingActions/BillingActions';
+import { ApiError } from '@/services/apiService';
 
 // The hook is replaced by a small stateful stand-in: the tests control when
 // each request settles, and the pending flags follow those requests the way

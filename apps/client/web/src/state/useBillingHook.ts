@@ -5,9 +5,10 @@
  * billing portal. Each resolves to the Stripe URL the caller redirects to; the
  * price is chosen by the server, so checkout sends an empty body.
  */
-import { api } from '@/services/apiService';
 import { useMutation } from '@tanstack/react-query';
 import { z } from 'zod';
+
+import { api } from '@/services/apiService';
 
 const stripeUrlResponseSchema = z.object({
   data: z.object({ url: z.string() }),

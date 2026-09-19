@@ -1,12 +1,13 @@
+import express from 'express';
+import type Stripe from 'stripe';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import type * as EnvConfigModule from 'app/config/envConfig.js';
 import { createCheckoutHandler } from 'app/handlers/billing/billingHandler.js';
 import { validate } from 'app/middleware/validateMiddleware.js';
 import { createCheckoutSchema } from 'app/schemas/billingSchema.js';
-import express from 'express';
-import type Stripe from 'stripe';
-import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The price comes from the server's env, never from the client. A getter keeps
 // STRIPE_PRICE_ID readable per test, so the unset case (B-4) can be forced.
