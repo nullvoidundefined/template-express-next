@@ -30,7 +30,7 @@ The spec (`docs/superpowers/specs/2026-09-19-billing-redirects.md`, deleted in t
 ## Testing
 
 - Tests were written first by the `test-author` agent, the R-907 fallback because Codex is out of quota until 2026-09-21; each round was confirmed failing before implementation.
-- Server unit 241 of 241; web unit 64 of 64 (twice); `tsc`, ESLint, Prettier, and every lefthook gate pass. The e2e spec compiles (`playwright test --list`) and runs in CI against the full stack, with the API and Stripe URLs intercepted.
+- Server unit 243 of 243 (after merging main); web unit 64 of 64 (twice); `tsc`, ESLint, Prettier, and every lefthook gate pass. The e2e spec compiles (`playwright test --list`) and runs in CI against the full stack, with the API and Stripe URLs intercepted.
 - Not done here: `apps/server/.env.example` should list `STRIPE_PRICE_ID` (and the other two Stripe variables, which it has never listed), but the harness blocks edits to `.env*` files, so the owner applies it.
 
 ## Reflection
