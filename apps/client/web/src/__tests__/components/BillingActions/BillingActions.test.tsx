@@ -103,6 +103,11 @@ describe('BillingActions', () => {
     await waitFor(() => {
       expect(assign).toHaveBeenCalledWith(CHECKOUT_URL);
     });
+    expect(screen.getByRole('button', { name: 'Redirecting' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Manage billing' }),
+    ).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('sends the browser to the portal URL when Manage billing is activated (C-2)', async () => {
@@ -116,6 +121,9 @@ describe('BillingActions', () => {
     await waitFor(() => {
       expect(assign).toHaveBeenCalledWith(PORTAL_URL);
     });
+    expect(screen.getByRole('button', { name: 'Redirecting' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Upgrade' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('disables both buttons while checkout is pending and ignores a second activation (C-3)', async () => {
