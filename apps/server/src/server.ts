@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/node';
+
 import { createApp } from 'app/app.js';
 import { env } from 'app/config/envConfig.js';
 import { pool, query, withTransaction } from 'app/database/databasePool.js';

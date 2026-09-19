@@ -1,4 +1,3 @@
-import { errorHandler } from 'app/middleware/errorHandlerMiddleware.js';
 import express, {
   type NextFunction,
   type Request,
@@ -6,6 +5,8 @@ import express, {
 } from 'express';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { errorHandler } from 'app/middleware/errorHandlerMiddleware.js';
 
 vi.mock('app/services/loggerService.js', () => ({
   logger: { error: vi.fn() },

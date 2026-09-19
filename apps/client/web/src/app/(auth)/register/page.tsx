@@ -2,9 +2,10 @@
 
 import { type FormEvent, useCallback, useState } from 'react';
 
-import { useAuth } from '@/state/useAuthHook';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+
+import { useAuth } from '@/state/useAuthHook';
 
 import styles from '../auth.module.scss';
 

@@ -1,7 +1,8 @@
-import AdminLayout from '@/app/(protected)/admin/layout';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import AdminLayout from '@/app/(protected)/admin/layout';
 
 vi.mock('next/headers', () => ({ cookies: vi.fn() }));
 vi.mock('next/navigation', () => ({

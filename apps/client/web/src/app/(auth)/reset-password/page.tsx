@@ -2,9 +2,10 @@
 
 import { type FormEvent, Suspense, useCallback, useState } from 'react';
 
-import { api } from '@/services/apiService';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+
+import { api } from '@/services/apiService';
 
 import styles from '../auth.module.scss';
 

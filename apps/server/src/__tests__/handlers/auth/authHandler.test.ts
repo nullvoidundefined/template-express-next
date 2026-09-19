@@ -1,3 +1,18 @@
+import http from 'node:http';
+
+import cookieParser from 'cookie-parser';
+import express from 'express';
+import request from 'supertest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { SESSION_COOKIE_NAME } from 'app/constants/sessionConstants.js';
 import { createAuthHandlers } from 'app/handlers/authHandler.js';
@@ -13,19 +28,6 @@ import {
   updateMeSchema,
 } from 'app/schemas/authSchema.js';
 import type { User } from 'app/schemas/authSchema.js';
-import cookieParser from 'cookie-parser';
-import express from 'express';
-import http from 'node:http';
-import request from 'supertest';
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
 
 // Inject fakes rather than mocking modules. The logger self-silences under
 // NODE_ENV=test, so it needs no mock.

@@ -1,8 +1,9 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { mockResult } from 'app/__tests__/helpers/mockResult.js';
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { createBillingRepo } from 'app/repositories/billingRepository.js';
 import type { BillingRepoDeps } from 'app/repositories/billingRepository.js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Inject a fake query rather than mocking the pool module.
 const mockQuery = vi.fn();

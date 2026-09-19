@@ -2,10 +2,11 @@
 // a real database. Exercises the full auth-scoped posts CRUD flow including CSRF
 // and loadSession. Skips gracefully when DATABASE_URL is not set.
 // Run: pnpm --filter server run test:integration
-import { createApp } from 'app/app.js';
-import { query, withTransaction } from 'app/database/databasePool.js';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
+
+import { createApp } from 'app/app.js';
+import { query, withTransaction } from 'app/database/databasePool.js';
 
 const { app: testApp } = createApp({ query, withTransaction });
 

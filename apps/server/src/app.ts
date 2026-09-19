@@ -1,4 +1,8 @@
 import * as Sentry from '@sentry/node';
+import cookieParser from 'cookie-parser';
+import express from 'express';
+import helmet from 'helmet';
+
 import { trackEvent } from 'app/clients/analyticsClient.js';
 import { getStripe } from 'app/clients/stripeClient.js';
 import { corsConfig } from 'app/config/corsConfig.js';
@@ -33,9 +37,6 @@ import { createBillingRouter } from 'app/routes/billingRoutes.js';
 import { createPostsRouter } from 'app/routes/postsRoutes.js';
 import { createBillingService } from 'app/services/billingService.js';
 import { sendPasswordResetEmail } from 'app/services/emailService.js';
-import cookieParser from 'cookie-parser';
-import express from 'express';
-import helmet from 'helmet';
 
 const REQUEST_TIMEOUT_MS = 30_000;
 

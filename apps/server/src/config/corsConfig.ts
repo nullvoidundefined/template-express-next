@@ -1,5 +1,6 @@
-import { env } from 'app/config/envConfig.js';
 import cors from 'cors';
+
+import { env } from 'app/config/envConfig.js';
 
 export const corsConfig = cors({
   credentials: true,

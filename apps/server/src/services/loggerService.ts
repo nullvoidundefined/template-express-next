@@ -1,5 +1,6 @@
-import { isProd, isTest } from 'app/config/envConfig.js';
 import pino from 'pino';
+
+import { isProd, isTest } from 'app/config/envConfig.js';
 
 export const logger = pino({
   level: isTest ? 'silent' : isProd ? 'info' : 'debug',

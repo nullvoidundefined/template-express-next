@@ -1,9 +1,10 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { mockResult } from 'app/__tests__/helpers/mockResult.js';
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import type { PoolClient } from 'app/database/databasePool.js';
 import { createIdempotencyRepo } from 'app/repositories/idempotencyRepository.js';
 import type { IdempotencyRepoDeps } from 'app/repositories/idempotencyRepository.js';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockQuery = vi.fn();
 const fakeClient = {} as PoolClient;

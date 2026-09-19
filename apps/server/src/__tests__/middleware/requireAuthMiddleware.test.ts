@@ -1,3 +1,8 @@
+import cookieParser from 'cookie-parser';
+import express from 'express';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { SESSION_COOKIE_NAME } from 'app/constants/sessionConstants.js';
 import {
@@ -6,10 +11,6 @@ import {
   requireAuth,
 } from 'app/middleware/requireAuthMiddleware.js';
 import type { User } from 'app/schemas/authSchema.js';
-import cookieParser from 'cookie-parser';
-import express from 'express';
-import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const id = uuid();
 

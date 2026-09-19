@@ -2,15 +2,16 @@
  * Single smoke test for route wiring: verifies each path/method reaches the correct handler.
  * Handler behavior is covered by handler tests; this only guards against broken router wiring.
  */
+import express from 'express';
+import type { Request, Response } from 'express';
+import request from 'supertest';
+import { describe, expect, it } from 'vitest';
+
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import type { AuthHandlers } from 'app/handlers/authHandler.js';
 import type { PostsHandlers } from 'app/handlers/postsHandler.js';
 import { createAuthRouter } from 'app/routes/authRoutes.js';
 import { createPostsRouter } from 'app/routes/postsRoutes.js';
-import express from 'express';
-import type { Request, Response } from 'express';
-import request from 'supertest';
-import { describe, expect, it } from 'vitest';
 
 // Inject fake handlers rather than mocking the handler module. requireAuth is
 // the real pure gate; the auth rate limiter self-skips under NODE_ENV=test.

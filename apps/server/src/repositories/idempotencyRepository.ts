@@ -4,8 +4,9 @@
  * completed with the stored response, or released (deleted) when the request
  * fails, so the middleware can replay, reject, or rerun a retried request.
  */
-import type { PoolClient } from 'app/database/databasePool.js';
 import type { QueryResult, QueryResultRow } from 'pg';
+
+import type { PoolClient } from 'app/database/databasePool.js';
 
 interface IdempotencyRepoDeps {
   query: <T extends QueryResultRow>(

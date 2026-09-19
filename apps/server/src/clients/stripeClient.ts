@@ -1,5 +1,6 @@
-import { env } from 'app/config/envConfig.js';
 import Stripe from 'stripe';
+
+import { env } from 'app/config/envConfig.js';
 
 let _stripe: Stripe | null = null;
 

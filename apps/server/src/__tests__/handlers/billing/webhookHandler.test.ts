@@ -1,7 +1,8 @@
-import type * as EnvConfigModule from 'app/config/envConfig.js';
-import { createWebhookHandler } from 'app/handlers/billing/webhookHandler.js';
 import type { Request, Response } from 'express';
 import { describe, expect, it, vi } from 'vitest';
+
+import type * as EnvConfigModule from 'app/config/envConfig.js';
+import { createWebhookHandler } from 'app/handlers/billing/webhookHandler.js';
 
 // The handler reads the webhook secret from the frozen env module; force a
 // placeholder so the claim path is reachable. Signature checking itself is

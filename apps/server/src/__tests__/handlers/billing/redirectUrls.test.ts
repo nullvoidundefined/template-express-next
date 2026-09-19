@@ -1,12 +1,13 @@
+import express from 'express';
+import type Stripe from 'stripe';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { createCheckoutHandler } from 'app/handlers/billing/billingHandler.js';
 import { createPortalHandler } from 'app/handlers/billing/portalHandler.js';
 import { validate } from 'app/middleware/validateMiddleware.js';
 import { createCheckoutSchema } from 'app/schemas/billingSchema.js';
-import express from 'express';
-import type Stripe from 'stripe';
-import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // CLIENT_URL and CORS_ORIGIN are deliberately different so a handler that
 // builds redirect URLs from the wrong one is caught.

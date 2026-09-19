@@ -1,7 +1,9 @@
-import { logger } from 'app/services/loggerService.js';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+
 import { pinoHttp } from 'pino-http';
+
+import { logger } from 'app/services/loggerService.js';
 
 export const requestLogger = pinoHttp({
   logger,

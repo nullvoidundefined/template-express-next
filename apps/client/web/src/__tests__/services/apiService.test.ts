@@ -1,6 +1,7 @@
-import { ApiError, api } from '@/services/apiService';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+
+import { ApiError, api } from '@/services/apiService';
 
 describe('api', () => {
   beforeEach(() => {

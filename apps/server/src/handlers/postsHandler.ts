@@ -1,3 +1,5 @@
+import type { Request, Response } from 'express';
+
 import {
   ERROR_CODES,
   createErrorResponse,
@@ -10,7 +12,6 @@ import type {
 } from 'app/schemas/postsSchema.js';
 import { parseIdParam } from 'app/services/parseIdParamParser.js';
 import { parsePagination } from 'app/services/parsePaginationParser.js';
-import type { Request, Response } from 'express';
 
 interface PostsHandlerDeps {
   postsRepo: PostsRepo;

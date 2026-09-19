@@ -1,7 +1,8 @@
-import { requestLogger } from 'app/middleware/requestLoggerMiddleware.js';
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it, vi } from 'vitest';
+
+import { requestLogger } from 'app/middleware/requestLoggerMiddleware.js';
 
 vi.mock('app/services/loggerService.js', async () => {
   const { default: pino } = await import('pino');
