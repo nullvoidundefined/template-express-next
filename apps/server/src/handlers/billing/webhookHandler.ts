@@ -72,8 +72,11 @@ function createWebhookHandler({
       return;
     }
 
-    const claimed = await billingRepo.claimStripeEvent(event.id, event.type);
-    if (!claimed) {
+    const claimAttempt = await billingRepo.claimStripeEvent(
+      event.id,
+      event.type,
+    );
+    if (claimAttempt === null) {
       res.json({ received: true });
       return;
     }
@@ -106,9 +109,9 @@ function createWebhookHandler({
           );
           break;
       }
-      await billingRepo.markStripeEventProcessed(event.id);
+      await billingRepo.markStripeEventProcessed(event.id, claimAttempt);
     } catch (err) {
-      await billingRepo.markStripeEventFailed(event.id);
+      await billingRepo.markStripeEventFailed(event.id, claimAttempt);
       logger.error(
         { err, eventId: event.id, eventType: event.type },
         'Webhook processing failed',

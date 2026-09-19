@@ -105,40 +105,55 @@ function createBillingRepo({ query }: BillingRepoDeps) {
     );
   }
 
-  // Claims an event for processing. A new event is inserted; an existing row is
-  // re-claimed only when its last attempt failed (Stripe is redelivering after
-  // our 500) or its 'processing' claim is older than the stale window (the
-  // handler died mid-processing). ON CONFLICT ... DO UPDATE locks the row, so
-  // two concurrent deliveries can never both claim it.
+  // Claims an event for processing and returns the claim's attempt number, or
+  // null when the event is not claimable. A new event is inserted as attempt 1;
+  // an existing row is re-claimed, with its attempt incremented, only when its
+  // last attempt failed (Stripe is redelivering after our 500) or its
+  // 'processing' claim is older than the stale window (the handler died or
+  // stalled). ON CONFLICT ... DO UPDATE locks the row, so two concurrent
+  // deliveries can never both claim it.
   async function claimStripeEvent(
     eventId: string,
     eventType: string,
-  ): Promise<boolean> {
-    const result = await query(
-      `INSERT INTO stripe_events (event_id, event_type, status, attempted_at)
-     VALUES ($1, $2, 'processing', NOW())
+  ): Promise<number | null> {
+    const result = await query<{ claim_attempt: number }>(
+      `INSERT INTO stripe_events (event_id, event_type, status, attempted_at, claim_attempt)
+     VALUES ($1, $2, 'processing', NOW(), 1)
      ON CONFLICT (event_id) DO UPDATE
-       SET status = 'processing', attempted_at = NOW()
+       SET status = 'processing',
+           attempted_at = NOW(),
+           claim_attempt = stripe_events.claim_attempt + 1
        WHERE stripe_events.status = 'failed'
           OR (stripe_events.status = 'processing'
               AND stripe_events.attempted_at < NOW() - $3 * INTERVAL '1 second')
-     RETURNING event_id`,
+     RETURNING claim_attempt`,
       [eventId, eventType, STRIPE_EVENT_CLAIM_STALE_SECONDS],
     );
-    return result.rowCount !== null && result.rowCount > 0;
+    return result.rows[0]?.claim_attempt ?? null;
   }
 
-  async function markStripeEventProcessed(eventId: string): Promise<void> {
+  // Completion writes are fenced by the claim attempt: they land only while the
+  // given attempt still holds the claim, so a slow handler whose stale claim
+  // was taken over cannot overwrite the newer attempt's result.
+  async function markStripeEventProcessed(
+    eventId: string,
+    claimAttempt: number,
+  ): Promise<void> {
     await query(
-      `UPDATE stripe_events SET status = 'processed', processed_at = NOW() WHERE event_id = $1`,
-      [eventId],
+      `UPDATE stripe_events SET status = 'processed', processed_at = NOW()
+     WHERE event_id = $1 AND claim_attempt = $2 AND status = 'processing'`,
+      [eventId, claimAttempt],
     );
   }
 
-  async function markStripeEventFailed(eventId: string): Promise<void> {
+  async function markStripeEventFailed(
+    eventId: string,
+    claimAttempt: number,
+  ): Promise<void> {
     await query(
-      `UPDATE stripe_events SET status = 'failed' WHERE event_id = $1`,
-      [eventId],
+      `UPDATE stripe_events SET status = 'failed'
+     WHERE event_id = $1 AND claim_attempt = $2 AND status = 'processing'`,
+      [eventId, claimAttempt],
     );
   }
 
