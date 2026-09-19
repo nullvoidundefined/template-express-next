@@ -39,13 +39,19 @@ interface ClaimOwner {
   userId: string;
 }
 
+// An omitted body hashes the empty string, which no JSON.stringify output can
+// equal, so it never collides with a request whose JSON body is {}.
+function hashRequestBody(body: unknown): string {
+  return hashToken(body === undefined ? '' : JSON.stringify(body));
+}
+
 // Typed with an unknown body so the parsed JSON is never read as any.
 function buildRequestFingerprint(
   req: Request<unknown, unknown, unknown>,
 ): RequestFingerprint {
   const { body, method, originalUrl } = req;
   return {
-    requestBodyHash: hashToken(JSON.stringify(body ?? {})),
+    requestBodyHash: hashRequestBody(body),
     requestMethod: method,
     requestPath: originalUrl,
   };

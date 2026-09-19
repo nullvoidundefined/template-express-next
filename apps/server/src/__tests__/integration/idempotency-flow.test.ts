@@ -480,3 +480,28 @@ describe.skipIf(!DB_AVAILABLE)('idempotency integration', () => {
     expect(runsOf('create')).toBe(2);
   });
 });
+
+describe.skipIf(!DB_AVAILABLE)('idempotency integration body presence', () => {
+  beforeEach(async () => {
+    currentUser = await insertUser();
+    gate = createDeferred();
+    runCounts = {};
+  });
+
+  it('answers 422 when a key used without a body is reused with {} (I-21)', async () => {
+    // No .send() call: no body and no Content-Type, so req.body is undefined.
+    const first = await request(testApp)
+      .post('/create')
+      .set('Idempotency-Key', 'key-no-body');
+    await waitForKeyStatus('key-no-body', 'completed');
+    const second = await post('/create', 'key-no-body', {});
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(422);
+    expect(second.body).toEqual({
+      code: 'IDEMPOTENCY_KEY_REUSED',
+      error: expect.any(String) as unknown,
+    });
+    expect(runsOf('create')).toBe(1);
+  });
+});

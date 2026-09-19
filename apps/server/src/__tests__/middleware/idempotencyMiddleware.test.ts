@@ -1099,3 +1099,72 @@ describe('idempotency middleware', () => {
     });
   });
 });
+
+describe('idempotency middleware body presence (I-21)', () => {
+  beforeEach(() => {
+    fakeRepo = createFakeIdempotencyRepo();
+    gate = createDeferred();
+    isClientGone = false;
+    runCounts = {};
+    timeoutFired = createDeferred();
+  });
+
+  afterEach(() => {
+    gate.resolve();
+  });
+
+  // No .send() call: the request carries no body and no Content-Type, so
+  // express.json() leaves req.body undefined.
+  function postWithoutBody(app: express.Express, key: string) {
+    return request(app).post('/create').set('Idempotency-Key', key);
+  }
+
+  function postEmptyObject(app: express.Express, key: string) {
+    return request(app).post('/create').set('Idempotency-Key', key).send({});
+  }
+
+  it('answers 422 when a key used without a body is reused with {}', async () => {
+    const app = buildApp(true);
+
+    const first = await postWithoutBody(app, 'k-no-body-first');
+    await waitForStatus('k-no-body-first', 'completed');
+    const second = await postEmptyObject(app, 'k-no-body-first');
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(422);
+    expect(second.body).toEqual({
+      code: 'IDEMPOTENCY_KEY_REUSED',
+      error: expect.any(String) as unknown,
+    });
+    expect(runsOf('create')).toBe(1);
+  });
+
+  it('answers 422 when a key used with {} is reused without a body', async () => {
+    const app = buildApp(true);
+
+    const first = await postEmptyObject(app, 'k-empty-object-first');
+    await waitForStatus('k-empty-object-first', 'completed');
+    const second = await postWithoutBody(app, 'k-empty-object-first');
+
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(422);
+    expect(second.body).toEqual({
+      code: 'IDEMPOTENCY_KEY_REUSED',
+      error: expect.any(String) as unknown,
+    });
+    expect(runsOf('create')).toBe(1);
+  });
+
+  it('replays an exact retry without a body', async () => {
+    const app = buildApp(true);
+
+    const first = await postWithoutBody(app, 'k-no-body-retry');
+    await waitForStatus('k-no-body-retry', 'completed');
+    const retry = await postWithoutBody(app, 'k-no-body-retry');
+
+    expect(first.status).toBe(201);
+    expect(retry.status).toBe(201);
+    expect(retry.body).toEqual(first.body);
+    expect(runsOf('create')).toBe(1);
+  });
+});
