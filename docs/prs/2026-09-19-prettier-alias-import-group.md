@@ -11,9 +11,10 @@ The workspace Prettier import sorter and the harness push ESLint gate required o
 ## What changed
 
 - Both workspace Prettier configs gain two `importOrder` groups: `^node:(.*)$` before third-party modules and the path alias (`^app/(.*)$` on the server, `^@/(.*)$` on the web client) after them. This is the layout the gate's `import-x/order` configuration documents.
-- Both workspaces are reformatted; outside the two configs, every changed line is an import reordering or a blank line between groups.
+- Both workspaces are reformatted; outside the two configs, every changed line is an import reordering or a blank line between groups (the one reordering with a runtime effect is listed below).
 - The server config stops import-sorting TypeScript samples inside Markdown (`embeddedLanguageFormatting: 'off'`), which the web config already did; otherwise the new groups reshuffled the illustrative examples in `apps/server/CLAUDE.md`.
 - `requestLoggerMiddleware.ts` imports `node:crypto` instead of the bare `crypto` specifier, so it sorts with the other built-ins.
+- One reordering changes runtime behavior, for the better: in `apps/server/src/worker.ts`, `import 'dotenv/config'` moved from third to first. Under ESM the old order evaluated `envConfig` (which parses `process.env`) before dotenv loaded `.env`, so `pnpm dev:worker` crashed without exported variables (audit finding 8); the new order loads `.env` first. The worker still depends on import order for this, unlike `index.ts`, which loads the app through a dynamic import after dotenv; hardening that stays with IAN-134.
 
 ## Architectural decisions
 
