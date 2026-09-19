@@ -1,5 +1,6 @@
-import type { PoolClient } from 'app/database/databasePool.js';
 import type { QueryResult, QueryResultRow } from 'pg';
+
+import type { PoolClient } from 'app/database/databasePool.js';
 
 /**
  * Data-access dependency injected so tests can supply a fake query without

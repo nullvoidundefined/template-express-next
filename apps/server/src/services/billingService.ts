@@ -1,6 +1,7 @@
+import type Stripe from 'stripe';
+
 import type { BillingRepo } from 'app/repositories/billingRepository.js';
 import { logger } from 'app/services/loggerService.js';
-import type Stripe from 'stripe';
 
 function createBillingService(billingRepo: BillingRepo) {
   async function onCheckoutCompleted(

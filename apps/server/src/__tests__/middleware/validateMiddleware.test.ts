@@ -1,8 +1,9 @@
-import { validate } from 'app/middleware/validateMiddleware.js';
 import express from 'express';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
+
+import { validate } from 'app/middleware/validateMiddleware.js';
 
 const schema = z.object({
   age: z.coerce.number(),

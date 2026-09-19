@@ -1,6 +1,7 @@
+import pg from 'pg';
+
 import { env } from 'app/config/envConfig.js';
 import { logger } from 'app/services/loggerService.js';
-import pg from 'pg';
 
 const { Pool } = pg;
 

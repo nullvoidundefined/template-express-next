@@ -1,3 +1,6 @@
+import express from 'express';
+import type { Router } from 'express';
+
 import type { AuthHandlers } from 'app/handlers/authHandler.js';
 import { authRateLimiter } from 'app/middleware/rateLimiterMiddleware.js';
 import { requireAuth } from 'app/middleware/requireAuthMiddleware.js';
@@ -9,8 +12,6 @@ import {
   resetPasswordSchema,
   updateMeSchema,
 } from 'app/schemas/authSchema.js';
-import express from 'express';
-import type { Router } from 'express';
 
 function createAuthRouter(handlers: AuthHandlers): Router {
   const authRouter = express.Router();

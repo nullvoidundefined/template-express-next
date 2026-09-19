@@ -1,7 +1,8 @@
 'use client';
 
-import { useModalStore } from '@/state/useModalHook';
 import * as Dialog from '@radix-ui/react-dialog';
+
+import { useModalStore } from '@/state/useModalHook';
 
 import styles from './Modal.module.scss';
 

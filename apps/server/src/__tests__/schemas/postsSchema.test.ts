@@ -1,5 +1,6 @@
-import { createPostSchema, updatePostSchema } from 'app/schemas/postsSchema.js';
 import { describe, expect, it } from 'vitest';
+
+import { createPostSchema, updatePostSchema } from 'app/schemas/postsSchema.js';
 
 describe('createPostSchema', () => {
   it('accepts a valid title and body', () => {

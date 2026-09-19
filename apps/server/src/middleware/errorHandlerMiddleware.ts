@@ -1,3 +1,5 @@
+import type { NextFunction, Request, Response } from 'express';
+
 import { env } from 'app/config/envConfig.js';
 import {
   ERROR_CODES,
@@ -6,7 +8,6 @@ import {
 } from 'app/constants/errorCodesConstants.js';
 import { HTTP } from 'app/constants/httpConstants.js';
 import { logger } from 'app/services/loggerService.js';
-import type { NextFunction, Request, Response } from 'express';
 
 // Centralized error handler to ensure all uncaught errors are logged once and surfaced with a safe JSON response.
 // The full error is only exposed in non-production environments to avoid leaking implementation details.

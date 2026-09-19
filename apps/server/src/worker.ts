@@ -1,6 +1,7 @@
+import 'dotenv/config';
+
 import { createWorker } from 'app/clients/queueClient.js';
 import { logger } from 'app/services/loggerService.js';
-import 'dotenv/config';
 
 const worker = createWorker(async (job) => {
   switch (job.name) {

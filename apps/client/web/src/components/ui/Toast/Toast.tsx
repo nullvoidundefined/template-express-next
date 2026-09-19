@@ -2,8 +2,9 @@
 
 import { useEffect } from 'react';
 
-import { useToastStore } from '@/state/useToastHook';
 import * as RadixToast from '@radix-ui/react-toast';
+
+import { useToastStore } from '@/state/useToastHook';
 
 import styles from './Toast.module.scss';
 

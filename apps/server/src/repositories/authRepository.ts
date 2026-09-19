@@ -1,11 +1,13 @@
+import crypto from 'node:crypto';
+
+import bcrypt from 'bcrypt';
+import type { QueryResult, QueryResultRow } from 'pg';
+
 import { SALT_ROUNDS } from 'app/constants/authConstants.js';
 import { SESSION_TTL_MS } from 'app/constants/sessionConstants.js';
 import type { PoolClient } from 'app/database/databasePool.js';
 import type { User } from 'app/schemas/authSchema.js';
 import { hashToken } from 'app/services/hashService.js';
-import bcrypt from 'bcrypt';
-import crypto from 'node:crypto';
-import type { QueryResult, QueryResultRow } from 'pg';
 
 /**
  * Data-access dependencies injected into the repo so tests can supply fakes

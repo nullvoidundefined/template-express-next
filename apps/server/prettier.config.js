@@ -6,7 +6,12 @@ export default {
     '^react$',
     '^react-dom',
     '.*\\.css$',
+    // Node built-ins come before third-party modules, as import-x/order requires.
+    '^node:(.*)$',
     '<THIRD_PARTY_MODULES>',
+    // Path-alias imports form their own group after third-party modules, the
+    // layout the harness push ESLint gate (import-x/order) requires.
+    '^app/(.*)$',
     '^[../]',
     '^[./]',
   ],
@@ -14,6 +19,13 @@ export default {
   importOrderSortSpecifiers: true,
   jsxSingleQuote: true,
   overrides: [
+    {
+      // Code samples in Markdown docs are illustrative; do not import-sort them.
+      files: ['*.md'],
+      options: {
+        embeddedLanguageFormatting: 'off',
+      },
+    },
     {
       files: ['*.json'],
       options: {

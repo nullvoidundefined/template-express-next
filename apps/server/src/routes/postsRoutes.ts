@@ -1,9 +1,10 @@
+import express from 'express';
+import type { Router } from 'express';
+
 import type { PostsHandlers } from 'app/handlers/postsHandler.js';
 import { requireAuth } from 'app/middleware/requireAuthMiddleware.js';
 import { validate } from 'app/middleware/validateMiddleware.js';
 import { createPostSchema, updatePostSchema } from 'app/schemas/postsSchema.js';
-import express from 'express';
-import type { Router } from 'express';
 
 function createPostsRouter(handlers: PostsHandlers): Router {
   const postsRouter = express.Router();

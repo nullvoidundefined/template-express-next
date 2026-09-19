@@ -1,7 +1,8 @@
-import { redis } from 'app/clients/redisClient.js';
-import { logger } from 'app/services/loggerService.js';
 import { Queue, Worker } from 'bullmq';
 import type { Processor } from 'bullmq';
+
+import { redis } from 'app/clients/redisClient.js';
+import { logger } from 'app/services/loggerService.js';
 
 const jobQueue: Queue | null = redis
   ? new Queue('default-jobs', { connection: redis })

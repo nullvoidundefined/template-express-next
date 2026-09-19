@@ -3,6 +3,9 @@
  * the createRateLimiter factory both are built from, which lets tests build a
  * limiter with the shipped configuration and a small limit.
  */
+import rateLimit from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
+
 import { redisRateLimiter } from 'app/clients/redisClient.js';
 import { isTest } from 'app/config/envConfig.js';
 import {
@@ -10,8 +13,6 @@ import {
   createErrorResponse,
 } from 'app/constants/errorCodesConstants.js';
 import { logger } from 'app/services/loggerService.js';
-import rateLimit from 'express-rate-limit';
-import { RedisStore } from 'rate-limit-redis';
 
 const AUTH_RATE_LIMIT_MAX = 10;
 const GLOBAL_RATE_LIMIT_MAX = 100;

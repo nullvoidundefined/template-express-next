@@ -1,9 +1,10 @@
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+
 import { ModalProvider } from '@/components/ui/Modal/Modal';
 import { ToastViewport } from '@/components/ui/Toast/Toast';
 import { PostHogProvider } from '@/providers/PostHogProvider';
 import { QueryProvider } from '@/providers/QueryProvider';
-import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 
 import './globals.scss';
 

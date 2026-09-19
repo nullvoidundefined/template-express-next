@@ -6,9 +6,10 @@
 // attempt that currently holds the claim, so a slow handler whose claim was
 // taken over cannot overwrite the newer attempt's result.
 // Schema migration, TRUNCATE between tests, and pool teardown live in setup.ts.
+import { describe, expect, it } from 'vitest';
+
 import { query } from 'app/database/databasePool.js';
 import { createBillingRepo } from 'app/repositories/billingRepository.js';
-import { describe, expect, it } from 'vitest';
 
 const DB_AVAILABLE = !!process.env.DATABASE_URL;
 

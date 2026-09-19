@@ -3,9 +3,11 @@
 // restores the NOT NULL constraints (I-17). It changes the schema, so it lives
 // in its own file and migrates back up in afterAll, even when a test fails.
 // Initial migration, TRUNCATE between tests, and pool teardown live in setup.ts.
-import { query } from 'app/database/databasePool.js';
 import { execSync } from 'node:child_process';
+
 import { afterAll, describe, expect, it } from 'vitest';
+
+import { query } from 'app/database/databasePool.js';
 
 const CLAIM_MIGRATION = '1771879388553_add-idempotency-keys-claim';
 const DB_AVAILABLE = !!process.env.DATABASE_URL;

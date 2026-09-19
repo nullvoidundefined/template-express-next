@@ -1,9 +1,10 @@
-import { uuid } from 'app/__tests__/helpers/uuids.js';
-import { createAuthHandlers } from 'app/handlers/authHandler.js';
-import type { AuthRepo } from 'app/repositories/authRepository.js';
 import express from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { uuid } from 'app/__tests__/helpers/uuids.js';
+import { createAuthHandlers } from 'app/handlers/authHandler.js';
+import type { AuthRepo } from 'app/repositories/authRepository.js';
 
 // isDeployed() true represents any deployed env (staging or production), both
 // HTTPS, so cookies must be Secure. Keying on isProduction() alone would miss

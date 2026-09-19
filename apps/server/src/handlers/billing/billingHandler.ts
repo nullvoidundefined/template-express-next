@@ -1,7 +1,8 @@
-import { env } from 'app/config/envConfig.js';
-import type { CreateCheckoutInput } from 'app/schemas/billingSchema.js';
 import type { Request, Response } from 'express';
 import type Stripe from 'stripe';
+
+import { env } from 'app/config/envConfig.js';
+import type { CreateCheckoutInput } from 'app/schemas/billingSchema.js';
 
 interface CheckoutHandlerDeps {
   getStripe: () => Stripe;

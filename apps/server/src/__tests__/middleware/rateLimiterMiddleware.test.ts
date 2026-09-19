@@ -1,5 +1,6 @@
-import express from 'express';
 import { type Server, createServer } from 'node:http';
+
+import express from 'express';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

@@ -1,5 +1,6 @@
-import { HTTP } from 'app/constants/httpConstants.js';
 import { describe, expect, it } from 'vitest';
+
+import { HTTP } from 'app/constants/httpConstants.js';
 
 describe('HTTP.STATUS', () => {
   it('maps each status name to its numeric code', () => {

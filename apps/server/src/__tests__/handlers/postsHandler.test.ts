@@ -1,11 +1,12 @@
+import express from 'express';
+import request from 'supertest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { uuid } from 'app/__tests__/helpers/uuids.js';
 import { createPostsHandlers } from 'app/handlers/postsHandler.js';
 import { errorHandler } from 'app/middleware/errorHandlerMiddleware.js';
 import type { PostsRepo } from 'app/repositories/postsRepository.js';
 import type { Post } from 'app/schemas/postsSchema.js';
-import express from 'express';
-import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockPostsRepo = {
   createPost: vi.fn(),

@@ -1,9 +1,10 @@
+import type { Request, Response } from 'express';
+
 import {
   ERROR_CODES,
   createErrorResponse,
 } from 'app/constants/errorCodesConstants.js';
 import { HTTP } from 'app/constants/httpConstants.js';
-import type { Request, Response } from 'express';
 
 // Return a consistent JSON response for any unmatched route instead of the default HTML 404.
 export function notFoundHandler(_req: Request, res: Response) {
