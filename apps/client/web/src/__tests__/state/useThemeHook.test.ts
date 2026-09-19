@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { useThemeStore } from '../../state/useTheme';
+import { useThemeStore } from '../../state/useThemeHook';
 
 describe('useThemeStore', () => {
   afterEach(() => {
