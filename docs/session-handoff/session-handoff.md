@@ -1,43 +1,41 @@
 # Session Handoff
 
-Backend parity alignment (Plan B) is **COMPLETE and squash-merged to `main`**. The `template-express` and `template-express-next/apps/server` backends now follow one set of architectural decisions.
+Branch `fix/rate-limiter-test-flake` (ticket IAN-151, in review) makes the server rate limiter test deterministic and proves the shipped limits. The PR is open and waiting for the owner; it is not merged.
 
 ## Last commits
 
-- `template-express-next` `main`: `12411f8` "chore: clear all lint warnings to pass --max-warnings=0" (Plan B B1-B9 squash-merged as `9706d0b`, branch deleted). **PUSHED; CI green (incl. E2E).**
-- `template-express` `main`: `bdee356` "feat: convert users identity to uuid primary key" (Plan A complete, merged). **PUSHED; CI green.**
+- `fix/rate-limiter-test-flake`: `8f3c284` B-1 RED test (Codex), `4390f93` B-1 `createRateLimiter` factory, `7b11968` B-2 shipped-wiring tests (test-author fallback), plus the PR doc and this handoff.
+- `main`: `6cbb801` "fix(billing): fence Stripe webhook completion writes to the claiming attempt (#5)".
 
 ## Production state
 
-Both repos pushed to `origin/main`; GitHub Actions CI green on both. The `template-express-next` CI run executed the full Playwright E2E suite (the `/v1` `posts.spec.ts` passed in CI). Nothing deployed to Railway (template repos).
+Template repo; nothing deployed. The shipped limiters' production behavior is unchanged (same limit, window, envelope, headers, and Redis prefix).
 
-Parity alignment (Plan A + Plan B) is COMPLETE and shipped. No pending parity work.
+## Session metrics
 
-## What shipped (Plan B, now one squashed commit on `main`)
+- Commits this session: 4 (three code and test commits plus this docs commit).
+- Files changed: 4 (the rate limiter module, its test, the PR doc, this handoff).
+- Rework count: 1 (review sent the tests back for B-2).
+- Velocity flag: NORMAL.
 
-- **Error contract:** `{ code, error }` envelope everywhere via `app/errors.js` registry; `errorHandler` maps status -> code and returns 503 `DATABASE_UNAVAILABLE` for driver/Postgres connectivity errors; `HTTP.STATUS` constants replace numeric literals; web `ApiError` carries `code`.
-- **Factory DI** (pre-session) across repos/handlers/middleware/routers; `createApp(deps)`.
-- **validate middleware** at the router layer (handlers read `req.body as XxxInput`); **hashToken** shared helper.
-- **Isolated integration setup** (`__tests__/integration/setup.ts`: migrate once + TRUNCATE between tests, LOCAL-only R-110 guard).
-- **posts resource** (uuid PK, user_id FK, pagination, validate, `{ data }`/`{ data, meta }`).
-- **Idempotency keys** (table + repo + middleware mounted after `loadSession`; 24h replay).
-- **`/v1` versioning** on all app routes (health + Stripe webhook stay at root); web client + proxy + layouts target `/v1`.
-- **pg_cron cleanup migration** (sessions + idempotency keys; silently skips without pg_cron) and **OpenAPI 3.1 spec** at `apps/server/docs/openapi.yaml`.
+## What shipped on the branch
 
-Monorepo's better-than-reference choices kept (SSL via DATABASE_CA_CERT, `/health` split, in-process session cleanup interval).
+- Flake cause: each `request(app)` started its own ephemeral server, and one test fired 110 of them at once. It reproduced in 6 of 96 runs under CPU load; after the change it fails 0 of 96.
+- `createRateLimiter({ max, prefix, shouldSkip })` in `apps/server/src/middleware/rateLimiterMiddleware.ts`; the shipped `rateLimiter` and `authRateLimiter` are built from it.
+- The test file drives one listening server per test, mocks Redis to `null`, and forces `isTest` off to prove the global limit (100, 900-second window) and the auth limit (10) with the 429 envelope.
 
-## Verification (on `main`)
+## Verification
 
-- Server unit: **192** passing. Web unit: **34** passing. Build (both): clean. Lint: **0 errors** (10 pre-existing warnings, unrelated to Plan B).
-- Integration: **16** passing (auth 11 + posts 3 + idempotency 2) against LOCAL `template_test`. Run: `DATABASE_URL="postgresql://localhost:5432/template_test" SESSION_SECRET="test-secret" NODE_ENV=test pnpm --filter server test:integration`.
-- Migrations applied + verified on LOCAL `template_test` only (R-110). Local `postgresql@14` running (trust auth, user `iangreenough`).
+- `pnpm --filter ./apps/server test`: 28 files, 197 tests passing.
+- Mutation check: global max 10, a 1-second window, and a missing `message` each fail 2 to 3 tests.
 
-## Pending / next session
+## Pending
 
-No parity work remains; all follow-ups done.
+- High, owner, about 10 minutes: review and merge the PR. Codex review could not run (usage limit until 2026-09-21); a Claude reviewer substituted and its findings are resolved in B-2.
+- Medium, about 1 hour: `tdd.sh` cannot run Vitest in pnpm workspaces (it runs from the git root without `apps/server`'s config); offered as a separate task.
+- Low, about 45 minutes: audit finding 14 remainder, which is failing `validateEnv` in production without `REDIS_URL` and replacing its `console.warn` with the logger. The rate limiter prefix is still unproven by tests.
 
-- DONE: `template-express` CI bumped to `actions/checkout@v6` + `setup-node@v6` (`5dd8666`); the Node 20 deprecation warning is gone, CI green.
-- DONE: lint clean at `--max-warnings=0` in both `template-express-next` workspaces.
-- DONE: E2E runs in CI for `template-express-next` (the `/v1` `posts.spec.ts` passes there).
+## Next session
 
-Next real workstream (new scope, not leftover): the portfolio's app builds (`job-tracker-ai` -> ... -> `agentic-travel-agent`).
+- After the merge, close IAN-151 with actuals (started 2026-09-19T11:11:05Z, estimate 60 minutes). Read `docs/prs/2026-09-19-rate-limiter-test-flake.md` first.
+- For the finding 14 remainder, read `apps/server/src/config/envConfig.ts` and section 14 of `docs/audits/2026-09-19-fastapi-nuxt-parity-audit.md`.
