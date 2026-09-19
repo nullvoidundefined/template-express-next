@@ -20,6 +20,8 @@ const ERROR_CODES = {
   BILLING: {
     // Portal requested for a user with no Stripe customer
     NO_ACCOUNT: 'BILLING_NO_ACCOUNT',
+    // Checkout requested while no STRIPE_PRICE_ID is configured on the server
+    NOT_CONFIGURED: 'BILLING_NOT_CONFIGURED',
     // Stripe webhook signature failed verification
     WEBHOOK_INVALID_SIGNATURE: 'BILLING_WEBHOOK_INVALID_SIGNATURE',
     // Stripe webhook arrived without a signature header or secret configured

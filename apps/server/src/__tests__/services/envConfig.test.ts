@@ -22,6 +22,25 @@ describe('env', () => {
     }).toThrow();
   });
 
+  it('leaves STRIPE_PRICE_ID undefined when it is unset (B-5)', async () => {
+    const { env } = await import('../../config/envConfig.js');
+    expect(env.STRIPE_PRICE_ID).toBeUndefined();
+  });
+
+  it('exposes a STRIPE_PRICE_ID that matches the price pattern (B-5)', async () => {
+    vi.stubEnv('STRIPE_PRICE_ID', 'price_1AbC23dEf');
+    const { env } = await import('../../config/envConfig.js');
+    expect(env.STRIPE_PRICE_ID).toBe('price_1AbC23dEf');
+  });
+
+  it.each(['prod_1AbC23', 'price_', 'price_abc-def', 'price_abc def'])(
+    'refuses to load with STRIPE_PRICE_ID %j (B-5)',
+    async (invalidPriceId) => {
+      vi.stubEnv('STRIPE_PRICE_ID', invalidPriceId);
+      await expect(import('../../config/envConfig.js')).rejects.toThrow();
+    },
+  );
+
   it('exports isDev, isProd, isDeployed helpers', async () => {
     const { isDev, isDeployed, isProd } =
       await import('../../config/envConfig.js');

@@ -10,7 +10,8 @@ import { validate } from 'app/middleware/validateMiddleware.js';
 import { createCheckoutSchema } from 'app/schemas/billingSchema.js';
 
 // CLIENT_URL and CORS_ORIGIN are deliberately different so a handler that
-// builds redirect URLs from the wrong one is caught.
+// builds redirect URLs from the wrong one is caught. The price is configured on
+// the server, so checkout posts an empty body.
 vi.mock('app/config/envConfig.js', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown> & {
     env: Record<string, unknown>;
@@ -21,6 +22,7 @@ vi.mock('app/config/envConfig.js', async (importOriginal) => {
       ...actual.env,
       CLIENT_URL: 'https://app.example.com',
       CORS_ORIGIN: 'https://api.example.com',
+      STRIPE_PRICE_ID: 'price_Server123',
     },
     isProduction: () => true,
   };
@@ -63,13 +65,17 @@ beforeEach(() => {
 });
 
 describe('billing redirect URLs use CLIENT_URL', () => {
-  it('checkout success_url and cancel_url point at CLIENT_URL', async () => {
-    await request(app).post('/checkout').send({ priceId: 'price_123' });
+  it('checkout success_url and cancel_url return to the dashboard (B-1)', async () => {
+    const res = await request(app).post('/checkout').send({});
 
+    expect(res.status).toBe(200);
     const arg = createCheckoutMock.mock.calls[0]?.[0];
-    expect(arg.success_url).toContain('https://app.example.com');
-    expect(arg.cancel_url).toContain('https://app.example.com');
-    expect(arg.success_url).not.toContain('https://api.example.com');
+    expect(arg.success_url).toBe(
+      'https://app.example.com/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+    );
+    expect(arg.cancel_url).toBe(
+      'https://app.example.com/dashboard?checkout=canceled',
+    );
   });
 
   it('rejects a priceId that is not a Stripe price ID', async () => {
@@ -81,15 +87,17 @@ describe('billing redirect URLs use CLIENT_URL', () => {
     expect(createCheckoutMock).not.toHaveBeenCalled();
   });
 
-  it('portal return_url points at CLIENT_URL', async () => {
+  it('portal return_url returns to the dashboard (B-2)', async () => {
     mockGetSubscriptionByUserId.mockResolvedValue({
       stripe_customer_id: 'cus_123',
     });
 
-    await request(app).post('/portal').send({});
+    const res = await request(app).post('/portal').send({});
 
+    expect(res.status).toBe(200);
     const arg = createPortalMock.mock.calls[0]?.[0];
-    expect(arg.return_url).toContain('https://app.example.com');
-    expect(arg.return_url).not.toContain('https://api.example.com');
+    expect(arg.return_url).toBe(
+      'https://app.example.com/dashboard?portal=returned',
+    );
   });
 });

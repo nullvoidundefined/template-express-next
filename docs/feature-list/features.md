@@ -26,15 +26,24 @@ All application API routes below are served under the `/v1` prefix (e.g. `POST /
 | Update post | `PUT /posts/:id`    | Requires auth; user-scoped; `validate(updatePostSchema)`; 404 when not owned     |
 | Delete post | `DELETE /posts/:id` | Requires auth; user-scoped; 204 on success, 404 when not owned                   |
 
+## Billing
+
+| Feature            | Routes                         | Notes                                                                                                                                    |
+| ------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Start checkout     | `POST /billing/checkout`       | Requires auth; empty body; price from the server's `STRIPE_PRICE_ID` (a body field answers 400); 503 `BILLING_NOT_CONFIGURED` when unset |
+| Open portal        | `POST /billing/portal`         | Requires auth; 400 `BILLING_NO_ACCOUNT` when the user has no Stripe customer                                                             |
+| Return from Stripe | `/dashboard?checkout=...`      | Checkout returns to `?checkout=success` or `?checkout=canceled`, the portal to `?portal=returned`                                        |
+| Stripe webhook     | `POST /webhooks/stripe` (root) | Signature-verified; event ledger re-claims failed and stale events on redelivery; completion writes fenced by claim attempt              |
+
 ## Web client
 
-| Feature              | Route              | Notes                                                           |
-| -------------------- | ------------------ | --------------------------------------------------------------- |
-| Login page           | `/login`           | Shows reset-success banner on `?reset=true`                     |
-| Register page        | `/register`        |                                                                 |
-| Forgot password page | `/forgot-password` | Shows submitted state after request sent                        |
-| Reset password page  | `/reset-password`  | Reads `?token=` from URL; client-side password match validation |
-| Dashboard            | `/dashboard`       | Auth-guarded via `(protected)` layout                           |
+| Feature              | Route              | Notes                                                                                                                                            |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Login page           | `/login`           | Shows reset-success banner on `?reset=true`                                                                                                      |
+| Register page        | `/register`        |                                                                                                                                                  |
+| Forgot password page | `/forgot-password` | Shows submitted state after request sent                                                                                                         |
+| Reset password page  | `/reset-password`  | Reads `?token=` from URL; client-side password match validation                                                                                  |
+| Dashboard            | `/dashboard`       | Auth-guarded via `(protected)` layout; Upgrade and Manage billing buttons; checkout-outcome banner (`?checkout=success` or `?checkout=canceled`) |
 
 ## Observability
 
@@ -45,16 +54,16 @@ All application API routes below are served under the `/v1` prefix (e.g. `POST /
 
 ## Infrastructure
 
-| Feature                | Notes                                                                                             |
-| ---------------------- | ------------------------------------------------------------------------------------------------- |
-| Custom session cookies | `sid` cookie; SHA-256 hash in DB; 7-day TTL; `httpOnly`, `SameSite: lax`                          |
-| CSRF protection        | Header-only (`X-Requested-With: XMLHttpRequest`); no token endpoint                               |
-| Rate limiting          | Auth endpoints gated by `authRateLimiter`                                                         |
-| Session cleanup        | Background interval deletes expired sessions hourly                                               |
-| Health endpoints       | `GET /health` (liveness), `GET /health/ready` (DB connectivity)                                   |
-| Password reset emails  | Resend SDK; lazy-initialized; no-op without `RESEND_API_KEY`                                      |
-| Idempotency keys       | `Idempotency-Key` header replays the stored response for authenticated POST/PUT within 24h        |
-| Scheduled cleanup      | pg_cron hourly prune of expired sessions + stale idempotency keys; silently skips without pg_cron |
-| OpenAPI spec           | `apps/server/docs/openapi.yaml` (OpenAPI 3.1) documents all `/v1` routes + `{ code, error }`      |
-| Analytics constants    | `@repo/constants` package with typed `ANALYTICS_EVENTS`                                           |
-| Integration tests      | `pnpm --filter @template/server run test:integration`; skips without `DATABASE_URL`               |
+| Feature                | Notes                                                                                                                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Custom session cookies | `sid` cookie; SHA-256 hash in DB; 7-day TTL; `httpOnly`, `SameSite: lax`                                                                                                              |
+| CSRF protection        | Header-only (`X-Requested-With: XMLHttpRequest`); no token endpoint                                                                                                                   |
+| Rate limiting          | Auth endpoints gated by `authRateLimiter`                                                                                                                                             |
+| Session cleanup        | Background interval deletes expired sessions hourly                                                                                                                                   |
+| Health endpoints       | `GET /health` (liveness), `GET /health/ready` (DB connectivity)                                                                                                                       |
+| Password reset emails  | Resend SDK; lazy-initialized; no-op without `RESEND_API_KEY`                                                                                                                          |
+| Idempotency keys       | `Idempotency-Key` on authenticated POST/PUT: claimed before the handler, replayed within 24h, 409 while running, 422 on reuse for a different request, released on 5xx/408/disconnect |
+| Scheduled cleanup      | pg_cron hourly prune of expired sessions + stale idempotency keys; silently skips without pg_cron                                                                                     |
+| OpenAPI spec           | `apps/server/docs/openapi.yaml` (OpenAPI 3.1) documents all `/v1` routes + `{ code, error }`                                                                                          |
+| Analytics constants    | `@repo/constants` package with typed `ANALYTICS_EVENTS`                                                                                                                               |
+| Integration tests      | `pnpm --filter @template/server run test:integration`; skips without `DATABASE_URL`                                                                                                   |

@@ -41,7 +41,7 @@ function createPortalHandler({ billingRepo, getStripe }: PortalHandlerDeps) {
     const session = await stripe.billingPortal.sessions.create(
       {
         customer: subscription.stripe_customer_id as string,
-        return_url: `${env.CLIENT_URL}/settings`,
+        return_url: `${env.CLIENT_URL}/dashboard?portal=returned`,
       },
       { idempotencyKey: randomUUID() },
     );
