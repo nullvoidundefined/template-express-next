@@ -3,10 +3,11 @@
 /**
  * The dashboard's billing buttons: Upgrade starts a Stripe Checkout and Manage
  * billing opens the Stripe portal, each redirecting the browser to the URL the
- * server returns. Both are disabled while either request is pending, and a
- * failure is announced in an alert.
+ * server returns. Both are disabled while either request is pending and while
+ * the browser is leaving for Stripe; a failure is announced in an alert that
+ * receives focus.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/Button/Button';
 import { ApiError } from '@/services/apiService';
@@ -24,20 +25,46 @@ function describeBillingError(err: unknown): string {
     : GENERIC_ERROR_MESSAGE;
 }
 
+type BillingRequestKind = 'checkout' | 'portal';
+
 function BillingActions() {
   const { isCheckoutPending, isPortalPending, openPortal, startCheckout } =
     useBilling();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const isPending = isCheckoutPending || isPortalPending;
+  const [redirectingTo, setRedirectingTo] = useState<BillingRequestKind | null>(
+    null,
+  );
+  const alertRef = useRef<HTMLParagraphElement>(null);
+  // Set synchronously on activation: TanStack reports pending only on a later
+  // macrotask, so a render-time flag alone lets a second click through.
+  const isRequestInFlightRef = useRef(false);
 
-  async function redirectToStripe(request: () => Promise<string>) {
-    if (isPending) {
+  const isCheckoutBusy = isCheckoutPending || redirectingTo === 'checkout';
+  const isPortalBusy = isPortalPending || redirectingTo === 'portal';
+  const isBusy = isCheckoutBusy || isPortalBusy;
+
+  useEffect(() => {
+    if (errorMessage !== null) {
+      alertRef.current?.focus();
+    }
+  }, [errorMessage]);
+
+  async function handleRedirectToStripe(
+    kind: BillingRequestKind,
+    request: () => Promise<string>,
+  ) {
+    if (isRequestInFlightRef.current || redirectingTo !== null) {
       return;
     }
+    isRequestInFlightRef.current = true;
     setErrorMessage(null);
     try {
-      window.location.assign(await request());
+      const url = await request();
+      // Hold the buttons disabled until the page unloads for Stripe.
+      setRedirectingTo(kind);
+      window.location.assign(url);
     } catch (err) {
+      isRequestInFlightRef.current = false;
       setErrorMessage(describeBillingError(err));
     }
   }
@@ -50,23 +77,23 @@ function BillingActions() {
     >
       <div className={styles.buttons}>
         <Button
-          disabled={isPending}
-          onClick={() => void redirectToStripe(startCheckout)}
+          disabled={isBusy}
+          onClick={() => void handleRedirectToStripe('checkout', startCheckout)}
           type='button'
         >
-          {isCheckoutPending ? 'Redirecting' : 'Upgrade'}
+          {isCheckoutBusy ? 'Redirecting' : 'Upgrade'}
         </Button>
         <Button
-          disabled={isPending}
-          onClick={() => void redirectToStripe(openPortal)}
+          disabled={isBusy}
+          onClick={() => void handleRedirectToStripe('portal', openPortal)}
           type='button'
           variant='secondary'
         >
-          {isPortalPending ? 'Redirecting' : 'Manage billing'}
+          {isPortalBusy ? 'Redirecting' : 'Manage billing'}
         </Button>
       </div>
       {errorMessage && (
-        <p className={styles.error} role='alert'>
+        <p className={styles.error} ref={alertRef} role='alert' tabIndex={-1}>
           {errorMessage}
         </p>
       )}

@@ -4,5 +4,3 @@ import { z } from 'zod';
 // so a client can never choose which price it subscribes to. Any field in the
 // body, priceId included, fails validation.
 export const createCheckoutSchema = z.object({}).strict();
-
-export type CreateCheckoutInput = z.infer<typeof createCheckoutSchema>;

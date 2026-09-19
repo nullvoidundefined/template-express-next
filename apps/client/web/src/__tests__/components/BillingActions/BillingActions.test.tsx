@@ -1,6 +1,12 @@
 import { BillingActions } from '@/components/BillingActions/BillingActions';
 import { ApiError } from '@/services/apiService';
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,29 +19,48 @@ const billingRequests = vi.hoisted(() => ({
   startCheckout: vi.fn<() => Promise<string>>(),
 }));
 
+// When isPendingDeferred is set, the stand-in reports pending changes only on
+// a later macrotask, as the real TanStack hook does (its notifyManager
+// schedules with setTimeout(0)), so a guard that relies on a re-render is
+// exposed (C-8).
+const hookBehaviour = vi.hoisted(() => ({ isPendingDeferred: false }));
+
 vi.mock('@/state/useBillingHook', async () => {
   const { useState } = await import('react');
+  function reportPending(setPending: (isPending: boolean) => void) {
+    return (isPending: boolean) => {
+      if (hookBehaviour.isPendingDeferred) {
+        setTimeout(() => {
+          setPending(isPending);
+        }, 0);
+        return;
+      }
+      setPending(isPending);
+    };
+  }
   return {
     useBilling: () => {
       const [isCheckoutPending, setCheckoutPending] = useState(false);
       const [isPortalPending, setPortalPending] = useState(false);
+      const reportCheckoutPending = reportPending(setCheckoutPending);
+      const reportPortalPending = reportPending(setPortalPending);
       return {
         isCheckoutPending,
         isPortalPending,
         openPortal: async () => {
-          setPortalPending(true);
+          reportPortalPending(true);
           try {
             return await billingRequests.openPortal();
           } finally {
-            setPortalPending(false);
+            reportPortalPending(false);
           }
         },
         startCheckout: async () => {
-          setCheckoutPending(true);
+          reportCheckoutPending(true);
           try {
             return await billingRequests.startCheckout();
           } finally {
-            setCheckoutPending(false);
+            reportCheckoutPending(false);
           }
         },
       };
@@ -59,6 +84,7 @@ describe('BillingActions', () => {
   beforeEach(() => {
     billingRequests.openPortal.mockReset();
     billingRequests.startCheckout.mockReset();
+    hookBehaviour.isPendingDeferred = false;
     assign.mockReset();
     vi.stubGlobal('location', { ...window.location, assign });
   });
@@ -205,5 +231,117 @@ describe('BillingActions', () => {
     render(<BillingActions />);
 
     expect(screen.queryAllByRole('heading', { level: 1 })).toHaveLength(0);
+  });
+
+  it('sends one checkout request for two clicks before any re-render (C-8)', async () => {
+    hookBehaviour.isPendingDeferred = true;
+    billingRequests.startCheckout.mockImplementation(neverSettles);
+    render(<BillingActions />);
+    const upgrade = screen.getByRole('button', { name: 'Upgrade' });
+
+    fireEvent.click(upgrade);
+    fireEvent.click(upgrade);
+
+    expect(billingRequests.startCheckout).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByRole('button', { name: 'Redirecting' }),
+    ).toBeDisabled();
+  });
+
+  it('sends one portal request for two clicks before any re-render (C-8)', async () => {
+    hookBehaviour.isPendingDeferred = true;
+    billingRequests.openPortal.mockImplementation(neverSettles);
+    render(<BillingActions />);
+    const manageBilling = screen.getByRole('button', {
+      name: 'Manage billing',
+    });
+
+    fireEvent.click(manageBilling);
+    fireEvent.click(manageBilling);
+
+    expect(billingRequests.openPortal).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByRole('button', { name: 'Redirecting' }),
+    ).toBeDisabled();
+  });
+
+  it('stays disabled and reads Redirecting after sending the browser to checkout (C-8)', async () => {
+    billingRequests.startCheckout.mockResolvedValue(CHECKOUT_URL);
+    render(<BillingActions />);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Upgrade' }));
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith(CHECKOUT_URL);
+    });
+    // Let the settled request report that it is no longer pending.
+    await act(async () => {
+      await new Promise((settle) => setTimeout(settle, 0));
+    });
+
+    const redirecting = screen.getByRole('button', { name: 'Redirecting' });
+    expect(redirecting).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Manage billing' }),
+    ).toBeDisabled();
+    fireEvent.click(redirecting);
+    expect(billingRequests.startCheckout).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays disabled and reads Redirecting after sending the browser to the portal (C-8)', async () => {
+    billingRequests.openPortal.mockResolvedValue(PORTAL_URL);
+    render(<BillingActions />);
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Manage billing' }),
+    );
+    await waitFor(() => {
+      expect(assign).toHaveBeenCalledWith(PORTAL_URL);
+    });
+    await act(async () => {
+      await new Promise((settle) => setTimeout(settle, 0));
+    });
+
+    const redirecting = screen.getByRole('button', { name: 'Redirecting' });
+    expect(redirecting).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Upgrade' })).toBeDisabled();
+    fireEvent.click(redirecting);
+    expect(billingRequests.openPortal).toHaveBeenCalledTimes(1);
+  });
+
+  it('moves focus to the alert when the portal has no billing account (C-9)', async () => {
+    billingRequests.openPortal.mockRejectedValue(
+      new ApiError(400, 'No billing account found', 'BILLING_NO_ACCOUNT'),
+    );
+    const user = userEvent.setup();
+    render(<BillingActions />);
+
+    await user.tab();
+    await user.tab();
+    expect(
+      screen.getByRole('button', { name: 'Manage billing' }),
+    ).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(NO_ACCOUNT_ERROR);
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveFocus();
+    });
+  });
+
+  it('moves focus to the alert when checkout fails (C-9)', async () => {
+    billingRequests.startCheckout.mockRejectedValue(new Error('Network down'));
+    const user = userEvent.setup();
+    render(<BillingActions />);
+
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Upgrade' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(GENERIC_ERROR);
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveFocus();
+    });
   });
 });

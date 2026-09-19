@@ -18,7 +18,7 @@ export const tokens = {
     background:            '#ffffff',
     backgroundTranslucent: 'rgba(255, 255, 255, 0.92)',
     border:                '#ebebeb',
-    error:                 '#ef4444',
+    error:                 '#dc2626', // 4.83:1 on background; text must meet WCAG AA 4.5:1
     foreground:            '#222222',
     foregroundMuted:       '#717171',
     surface:               '#f7f7f7',
