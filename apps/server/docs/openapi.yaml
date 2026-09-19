@@ -39,10 +39,21 @@ components:
       in: header
       required: false
       description: >
-        Opaque client-generated key. A repeated authenticated POST/PUT with the
-        same key replays the first stored response within 24 hours.
+        Opaque client-generated key, at most 255 characters (longer answers 400
+        INPUT_VALIDATION_ERROR). It applies to every POST/PUT from an
+        authenticated user, including auth routes called with a live session.
+        The key is bound to the request's method, URL (path and query string),
+        and body: a retry of a completed request
+        within 24 hours replays its stored status and body without running the
+        handler; a retry while the first request is still running answers 409
+        IDEMPOTENCY_REQUEST_IN_PROGRESS; reusing the key for a different
+        request answers 422 IDEMPOTENCY_KEY_REUSED. A response of 500 or above,
+        a 408 timeout, or a dropped connection releases the key so a retry runs
+        again. A replay carries the stored status and body only, not the first
+        response's headers (such as Set-Cookie).
       schema:
         type: string
+        maxLength: 255
 
   schemas:
     ErrorResponse:
@@ -65,6 +76,8 @@ components:
             - BILLING_WEBHOOK_MISCONFIGURED
             - BILLING_WEBHOOK_PROCESSING_FAILED
             - CSRF_HEADER_MISSING
+            - IDEMPOTENCY_KEY_REUSED
+            - IDEMPOTENCY_REQUEST_IN_PROGRESS
             - INPUT_VALIDATION_ERROR
             - POSTS_NOT_FOUND
             - RATE_LIMIT_EXCEEDED
@@ -164,6 +177,22 @@ components:
           maxLength: 10000
 
   responses:
+    IdempotencyKeyReused:
+      description: >
+        The Idempotency-Key was already used for a different request (method,
+        path, or body); code IDEMPOTENCY_KEY_REUSED.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    IdempotencyRequestInProgress:
+      description: >
+        A request with this Idempotency-Key is still running; retry later. Code
+        IDEMPOTENCY_REQUEST_IN_PROGRESS.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
     Unauthorized:
       description: Authentication required
       content:
@@ -438,6 +467,10 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyRequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
 
   /v1/posts/{id}:
     parameters:
@@ -490,6 +523,10 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyRequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
     delete:
       tags: [Posts]
       summary: Delete one of the current user's posts
@@ -513,6 +550,7 @@ paths:
         - cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -540,6 +578,10 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyRequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
 
   /v1/billing/portal:
     post:
@@ -549,6 +591,7 @@ paths:
         - cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
           description: Portal session URL
@@ -570,3 +613,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyRequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
