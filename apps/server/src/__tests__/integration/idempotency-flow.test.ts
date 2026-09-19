@@ -84,6 +84,14 @@ function buildApp(idempotencyRepo: IdempotencyRepo) {
     countRun('null-body');
     res.status(200).json(null);
   });
+  app.post('/end-200', (_req: Request, res: Response) => {
+    countRun('end-200');
+    res.status(200).end();
+  });
+  app.post('/text', (_req: Request, res: Response) => {
+    countRun('text');
+    res.status(200).send('plain text');
+  });
   app.post('/invalid', (_req: Request, res: Response) => {
     const run = countRun('invalid');
     res.status(400).json({ error: `invalid input ${String(run)}` });
@@ -100,13 +108,10 @@ const testApp = buildApp(idempotencyRepo);
 const slowCompletionApp = buildApp({
   ...idempotencyRepo,
   async completeKey(
-    key: string,
-    userId: string,
-    statusCode: number,
-    responseBody: unknown,
+    ...completion: Parameters<IdempotencyRepo['completeKey']>
   ): Promise<void> {
     await new Promise((settle) => setTimeout(settle, COMPLETION_DELAY_MS));
-    await idempotencyRepo.completeKey(key, userId, statusCode, responseBody);
+    await idempotencyRepo.completeKey(...completion);
   },
 });
 
@@ -130,6 +135,22 @@ async function readKeyStatus(key: string): Promise<string | null> {
     [key],
   );
   return result.rows[0]?.status ?? null;
+}
+
+// Reads how a completed response body was stored: whether a JSON body was
+// sent, and whether response_body is SQL NULL rather than the JSON value null.
+async function readStoredBody(
+  key: string,
+): Promise<{ hasJsonBody: boolean; isSqlNull: boolean } | undefined> {
+  const result = await query<{ has_json_body: boolean; is_sql_null: boolean }>(
+    `SELECT has_json_body, response_body IS NULL AS is_sql_null
+     FROM idempotency_keys WHERE key = $1`,
+    [key],
+  );
+  const [row] = result.rows;
+  return row
+    ? { hasJsonBody: row.has_json_body, isSqlNull: row.is_sql_null }
+    : undefined;
 }
 
 // The claim is completed or released when the response finishes, which can
@@ -375,6 +396,79 @@ describe.skipIf(!DB_AVAILABLE)('idempotency integration', () => {
     expect(second.headers['content-type']).toMatch(/application\/json/);
     expect(second.text).toBe('null');
     expect(runsOf('null-body')).toBe(1);
+  });
+
+  it('replays a retry sent the moment a 204 arrives (I-19)', async () => {
+    // Repeated with a slowed completion write so a claim settled only after
+    // the 204 is flushed shows up as a 409 on at least one attempt.
+    for (let attempt = 1; attempt <= 10; attempt += 1) {
+      runCounts = {};
+      const key = `key-immediate-204-${String(attempt)}`;
+      const payload = { attempt };
+      const send = () =>
+        request(slowCompletionApp)
+          .post('/empty')
+          .set('Idempotency-Key', key)
+          .send(payload);
+
+      const first = await send();
+      const retry = await send();
+
+      expect(first.status).toBe(204);
+      expect(retry.status).toBe(204);
+      expect(retry.text).toBe('');
+      expect(runsOf('empty')).toBe(1);
+    }
+  });
+
+  it('stores a JSON null body as a JSON value and replays it (I-18)', async () => {
+    const payload = { n: 1 };
+
+    await post('/null-body', 'key-null-stored', payload);
+    await waitForKeyStatus('key-null-stored', 'completed');
+    const stored = await readStoredBody('key-null-stored');
+    const replay = await post('/null-body', 'key-null-stored', payload);
+
+    expect(stored).toEqual({ hasJsonBody: true, isSqlNull: false });
+    expect(replay.status).toBe(200);
+    expect(replay.headers['content-type']).toMatch(/application\/json/);
+    expect(replay.text).toBe('null');
+    expect(runsOf('null-body')).toBe(1);
+  });
+
+  it('replays a 200 ended without a body as an empty 200 (I-18)', async () => {
+    const payload = { n: 1 };
+
+    await post('/end-200', 'key-end-200', payload);
+    await waitForKeyStatus('key-end-200', 'completed');
+    const stored = await readStoredBody('key-end-200');
+    const replay = await post('/end-200', 'key-end-200', payload);
+
+    expect(stored).toEqual({ hasJsonBody: false, isSqlNull: true });
+    expect(replay.status).toBe(200);
+    expect(replay.text).toBe('');
+    expect(replay.headers['content-type'] ?? '').not.toMatch(
+      /application\/json/,
+    );
+    expect(runsOf('end-200')).toBe(1);
+  });
+
+  it('replays a 200 text response as an empty 200 (I-18)', async () => {
+    const payload = { n: 1 };
+
+    const first = await post('/text', 'key-text', payload);
+    await waitForKeyStatus('key-text', 'completed');
+    const stored = await readStoredBody('key-text');
+    const replay = await post('/text', 'key-text', payload);
+
+    expect(first.text).toBe('plain text');
+    expect(stored).toEqual({ hasJsonBody: false, isSqlNull: true });
+    expect(replay.status).toBe(200);
+    expect(replay.text).toBe('');
+    expect(replay.headers['content-type'] ?? '').not.toMatch(
+      /application\/json/,
+    );
+    expect(runsOf('text')).toBe(1);
   });
 
   it('does not deduplicate when no Idempotency-Key is sent (I-9)', async () => {

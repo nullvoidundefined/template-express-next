@@ -17,6 +17,7 @@ interface ClaimInput {
 }
 
 interface StoredKey {
+  hasJsonBody: boolean;
   requestBodyHash: string | null;
   requestMethod: string | null;
   requestPath: string | null;
@@ -39,6 +40,7 @@ interface FakeIdempotencyRepo {
     ownerId: string,
     statusCode: number,
     responseBody: unknown,
+    hasJsonBody: boolean,
   ) => Promise<void>;
   findKey: (key: string, ownerId: string) => Promise<StoredKey | null>;
   releaseKey: (key: string, ownerId: string) => Promise<void>;
@@ -65,6 +67,7 @@ function createFakeIdempotencyRepo(): FakeIdempotencyRepo {
         return Promise.resolve(false);
       }
       rows.set(id, {
+        hasJsonBody: false,
         requestBodyHash: input.requestBodyHash,
         requestMethod: input.requestMethod,
         requestPath: input.requestPath,
@@ -79,11 +82,13 @@ function createFakeIdempotencyRepo(): FakeIdempotencyRepo {
       ownerId: string,
       statusCode: number,
       responseBody: unknown,
+      hasJsonBody: boolean,
     ): Promise<void> {
       const existing = rows.get(rowId(key, ownerId));
       if (existing?.status === 'in_progress') {
         rows.set(rowId(key, ownerId), {
           ...existing,
+          hasJsonBody,
           responseBody,
           status: 'completed',
           statusCode,
@@ -130,6 +135,7 @@ let fakeRepo = createFakeIdempotencyRepo();
 let gate = createDeferred();
 let isClientGone = false;
 let runCounts: Record<string, number> = {};
+let timeoutFired = createDeferred();
 
 function countRun(route: string): number {
   runCounts[route] = (runCounts[route] ?? 0) + 1;
@@ -141,7 +147,8 @@ function runsOf(route: string): number {
 }
 
 // Mirrors the request timeout middleware in app.ts: on expiry it answers 408
-// through res.json, then destroys the request.
+// through res.json, then destroys the request. It also resolves timeoutFired so
+// a test can hold storage until the timeout has happened.
 function createTimeoutMiddleware(timeoutMs: number) {
   return function requestTimeout(
     req: Request,
@@ -156,6 +163,7 @@ function createTimeoutMiddleware(timeoutMs: number) {
         });
       }
       req.destroy();
+      timeoutFired.resolve();
     });
     next();
   };
@@ -267,6 +275,14 @@ function buildApp(withUser: boolean, timeoutMs?: number) {
     countRun('null-body');
     res.status(200).json(null);
   });
+  app.post('/end-200', (_req: Request, res: Response) => {
+    countRun('end-200');
+    res.status(200).end();
+  });
+  app.post('/text', (_req: Request, res: Response) => {
+    countRun('text');
+    res.status(200).send('plain text');
+  });
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(500).json({ error: String(err) });
   });
@@ -293,6 +309,7 @@ describe('idempotency middleware', () => {
     gate = createDeferred();
     isClientGone = false;
     runCounts = {};
+    timeoutFired = createDeferred();
   });
 
   afterEach(() => {
@@ -351,6 +368,7 @@ describe('idempotency middleware', () => {
       await waitForStatus('k-print', 'completed');
 
       expect(fakeRepo.storedKey('k-print')).toEqual({
+        hasJsonBody: true,
         requestBodyHash: hashBody(payload),
         requestMethod: 'POST',
         requestPath: '/create?page=2',
@@ -364,6 +382,7 @@ describe('idempotency middleware', () => {
       const app = buildApp(true);
       const payload = { title: 'Seeded' };
       fakeRepo.seedKey('k-seed', {
+        hasJsonBody: true,
         requestBodyHash: hashBody(payload),
         requestMethod: 'POST',
         requestPath: '/create',
@@ -518,6 +537,7 @@ describe('idempotency middleware', () => {
       const app = buildApp(true);
       const payload = { title: 'Pending' };
       fakeRepo.seedKey('k-pending', {
+        hasJsonBody: false,
         requestBodyHash: hashBody(payload),
         requestMethod: 'POST',
         requestPath: '/create',
@@ -545,6 +565,7 @@ describe('idempotency middleware', () => {
 
     beforeEach(() => {
       fakeRepo.seedKey('k-reuse', {
+        hasJsonBody: true,
         requestBodyHash: hashBody(payload),
         requestMethod: 'POST',
         requestPath: '/create',
@@ -605,6 +626,7 @@ describe('idempotency middleware', () => {
     it('answers 422 for a different body while the first is in progress', async () => {
       const app = buildApp(true);
       fakeRepo.seedKey('k-reuse', {
+        hasJsonBody: false,
         requestBodyHash: hashBody(payload),
         requestMethod: 'POST',
         requestPath: '/create',
@@ -666,6 +688,7 @@ describe('idempotency middleware', () => {
       expect(second.text).toBe('');
       expect(runsOf('empty')).toBe(1);
       expect(fakeRepo.storedKey('k-204')).toMatchObject({
+        hasJsonBody: false,
         responseBody: null,
         status: 'completed',
         statusCode: 204,
@@ -676,6 +699,7 @@ describe('idempotency middleware', () => {
       const app = buildApp(true);
       const payload = { n: 2 };
       fakeRepo.seedKey('k-204-seed', {
+        hasJsonBody: false,
         requestBodyHash: hashBody(payload),
         requestMethod: 'POST',
         requestPath: '/empty',
@@ -743,14 +767,15 @@ describe('idempotency middleware', () => {
       const app = buildApp(true, 50);
       const payload = { n: 1 };
 
-      // The timeout either delivers the 408 or the destroyed socket hangs up.
-      const firstStatus = await request(app)
+      // A socket hang-up is recorded as a null status so it fails the 408
+      // assertion below instead of throwing.
+      const first = await request(app)
         .post('/hang')
         .set('Idempotency-Key', 'k-timeout')
         .send(payload)
         .then(
-          (res) => res.status,
-          () => null,
+          (res) => ({ body: res.body as unknown, status: res.status }),
+          () => ({ body: null, status: null }),
         );
       await waitForStatus('k-timeout', 'absent');
       const retry = await request(app)
@@ -758,7 +783,13 @@ describe('idempotency middleware', () => {
         .set('Idempotency-Key', 'k-timeout')
         .send(payload);
 
-      expect([408, null]).toContain(firstStatus);
+      expect(first).toEqual({
+        body: {
+          code: 'SERVER_REQUEST_TIMEOUT',
+          error: expect.any(String) as unknown,
+        },
+        status: 408,
+      });
       expect(retry.status).toBe(201);
       expect(retry.body).toEqual({ data: { run: 2 } });
       expect(runsOf('hang')).toBe(2);
@@ -922,6 +953,148 @@ describe('idempotency middleware', () => {
       await waitForStatus(longestKey, 'completed');
 
       expect(res.status).toBe(201);
+      expect(runsOf('create')).toBe(1);
+    });
+  });
+
+  describe('responses without a JSON body (I-18)', () => {
+    it('replays a 200 ended without a body as an empty 200', async () => {
+      const app = buildApp(true);
+      const payload = { n: 1 };
+
+      const first = await request(app)
+        .post('/end-200')
+        .set('Idempotency-Key', 'k-end-200')
+        .send(payload);
+      await waitForStatus('k-end-200', 'completed');
+      const second = await request(app)
+        .post('/end-200')
+        .set('Idempotency-Key', 'k-end-200')
+        .send(payload);
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(second.text).toBe('');
+      expect(second.headers['content-type'] ?? '').not.toMatch(
+        /application\/json/,
+      );
+      expect(runsOf('end-200')).toBe(1);
+      expect(fakeRepo.storedKey('k-end-200')).toMatchObject({
+        hasJsonBody: false,
+        statusCode: 200,
+      });
+    });
+
+    it('replays a 200 text response as an empty 200 without storing the text', async () => {
+      const app = buildApp(true);
+      const payload = { n: 1 };
+
+      const first = await request(app)
+        .post('/text')
+        .set('Idempotency-Key', 'k-text')
+        .send(payload);
+      await waitForStatus('k-text', 'completed');
+      const second = await request(app)
+        .post('/text')
+        .set('Idempotency-Key', 'k-text')
+        .send(payload);
+
+      expect(first.text).toBe('plain text');
+      expect(second.status).toBe(200);
+      expect(second.text).toBe('');
+      expect(second.headers['content-type'] ?? '').not.toMatch(
+        /application\/json/,
+      );
+      expect(runsOf('text')).toBe(1);
+      expect(fakeRepo.storedKey('k-text')).toMatchObject({
+        hasJsonBody: false,
+        responseBody: null,
+        statusCode: 200,
+      });
+    });
+
+    it('stores a JSON null body as a JSON body', async () => {
+      const app = buildApp(true);
+
+      await request(app)
+        .post('/null-body')
+        .set('Idempotency-Key', 'k-null-stored')
+        .send({ n: 1 });
+      await waitForStatus('k-null-stored', 'completed');
+
+      expect(fakeRepo.storedKey('k-null-stored')).toMatchObject({
+        hasJsonBody: true,
+        responseBody: null,
+        statusCode: 200,
+      });
+    });
+
+    it('replays a seeded row without a JSON body as an empty 200', async () => {
+      const app = buildApp(true);
+      const payload = { n: 2 };
+      fakeRepo.seedKey('k-end-seed', {
+        hasJsonBody: false,
+        requestBodyHash: hashBody(payload),
+        requestMethod: 'POST',
+        requestPath: '/end-200',
+        responseBody: null,
+        status: 'completed',
+        statusCode: 200,
+      });
+
+      const res = await request(app)
+        .post('/end-200')
+        .set('Idempotency-Key', 'k-end-seed')
+        .send(payload);
+
+      expect(res.status).toBe(200);
+      expect(res.text).toBe('');
+      expect(runsOf('end-200')).toBe(0);
+    });
+  });
+
+  describe('timeout while the response is held (I-20)', () => {
+    it('answers 408 and completes the claim with the handler result for the retry', async () => {
+      const { completeKey } = fakeRepo;
+      fakeRepo.completeKey = async (
+        key: string,
+        ownerId: string,
+        statusCode: number,
+        responseBody: unknown,
+        hasJsonBody: boolean,
+      ): Promise<void> => {
+        await timeoutFired.promise;
+        await completeKey(key, ownerId, statusCode, responseBody, hasJsonBody);
+      };
+      const app = buildApp(true, 50);
+      const payload = { title: 'Held' };
+      const send = () =>
+        request(app)
+          .post('/create')
+          .set('Idempotency-Key', 'k-held')
+          .send(payload);
+
+      const first = await send().then(
+        (res) => ({ body: res.body as unknown, status: res.status }),
+        () => ({ body: null, status: null }),
+      );
+      await waitForStatus('k-held', 'completed');
+      const retry = await send();
+
+      expect(first).toEqual({
+        body: {
+          code: 'SERVER_REQUEST_TIMEOUT',
+          error: expect.any(String) as unknown,
+        },
+        status: 408,
+      });
+      expect(fakeRepo.storedKey('k-held')).toMatchObject({
+        hasJsonBody: true,
+        responseBody: { data: { body: payload, run: 1 } },
+        statusCode: 201,
+      });
+      expect(retry.status).toBe(201);
+      expect(retry.body).toEqual({ data: { body: payload, run: 1 } });
       expect(runsOf('create')).toBe(1);
     });
   });

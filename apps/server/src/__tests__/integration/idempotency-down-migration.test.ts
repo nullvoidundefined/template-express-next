@@ -62,16 +62,21 @@ describe.skipIf(!DB_AVAILABLE)('idempotency claim down migration', () => {
 
   it('reverts on a table holding a completed 204 row (I-17)', async () => {
     const userId = await insertUserId();
+    // A 204 stored with SQL NULL, a JSON body, and a JSON null body (the JSON
+    // value null, not SQL NULL); only the SQL NULL row cannot survive.
     await query(
       `INSERT INTO idempotency_keys
-         (key, user_id, status, status_code, response_body)
-       VALUES ($1, $2, 'completed', 204, NULL),
-              ($3, $2, 'completed', 201, $4)`,
+         (key, user_id, status, status_code, response_body, has_json_body)
+       VALUES ($1, $2, 'completed', 204, NULL, false),
+              ($3, $2, 'completed', 201, $4, true),
+              ($5, $2, 'completed', 200, $6, true)`,
       [
         'key-stored-204',
         userId,
         'key-stored-201',
         JSON.stringify({ data: 'ok' }),
+        'key-stored-json-null',
+        JSON.stringify(null),
       ],
     );
 
@@ -83,6 +88,9 @@ describe.skipIf(!DB_AVAILABLE)('idempotency claim down migration', () => {
     expect(await readNullability('response_body')).toBe('NO');
     expect(await readNullability('status_code')).toBe('NO');
     expect(await readNullability('status')).toBeUndefined();
-    expect(await readStoredKeys()).toEqual(['key-stored-201']);
+    expect(await readStoredKeys()).toEqual([
+      'key-stored-201',
+      'key-stored-json-null',
+    ]);
   });
 });

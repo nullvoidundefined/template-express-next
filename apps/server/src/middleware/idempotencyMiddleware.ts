@@ -115,13 +115,12 @@ function sendRequestInProgress(res: Response): void {
     );
 }
 
-// A 204 carries no body by definition; any other status replays the stored
-// JSON, including a JSON null.
+// A response sent with a JSON body (a JSON null included) replays that body;
+// one sent without a JSON body replays its status with an empty body.
 function sendStoredResponse(res: Response, stored: StoredIdempotencyKey): void {
-  const { responseBody, statusCode } = stored;
-  const replayStatus = statusCode ?? HTTP.STATUS.OK;
-  res.status(replayStatus);
-  if (replayStatus === HTTP.STATUS.NO_CONTENT || responseBody === undefined) {
+  const { hasJsonBody, responseBody, statusCode } = stored;
+  res.status(statusCode ?? HTTP.STATUS.OK);
+  if (!hasJsonBody) {
     res.end();
     return;
   }
@@ -149,7 +148,7 @@ function answerFromHeldKey(
 function logSettleFailure(
   err: unknown,
   owner: ClaimOwner,
-  statusCode: number,
+  statusCode: number | undefined,
 ): void {
   const { key, requestId, userId } = owner;
   logger.error(
@@ -158,9 +157,10 @@ function logSettleFailure(
   );
 }
 
+// statusCode is undefined when the client left before any response existed.
 async function releaseClaim(
   owner: ClaimOwner,
-  statusCode: number,
+  statusCode: number | undefined,
 ): Promise<void> {
   const { idempotencyRepo, key, userId } = owner;
   try {
@@ -176,57 +176,84 @@ async function completeClaim(
   owner: ClaimOwner,
   statusCode: number,
   responseBody: unknown,
+  hasJsonBody: boolean,
 ): Promise<void> {
   const { idempotencyRepo, key, userId } = owner;
   try {
-    await idempotencyRepo.completeKey(key, userId, statusCode, responseBody);
+    await idempotencyRepo.completeKey(
+      key,
+      userId,
+      statusCode,
+      responseBody,
+      hasJsonBody,
+    );
   } catch (err) {
     logSettleFailure(err, owner, statusCode);
     await releaseClaim(owner, statusCode);
   }
 }
 
+interface SettledResponse {
+  hasJsonBody: boolean;
+  isFinished: boolean;
+  responseBody: unknown;
+  statusCode: number;
+}
+
 function settleClaim(
   owner: ClaimOwner,
-  statusCode: number,
-  responseBody: unknown,
-  isFinished: boolean,
+  { hasJsonBody, isFinished, responseBody, statusCode }: SettledResponse,
 ): Promise<void> {
   return !isFinished || isFailedStatus(statusCode)
     ? releaseClaim(owner, statusCode)
-    : completeClaim(owner, statusCode, responseBody);
+    : completeClaim(owner, statusCode, responseBody, hasJsonBody);
 }
 
-// Settles the claim exactly once. A JSON response is held until the claim is
-// settled, then sent; any other response (res.end, a 204) settles when it
-// finishes, and a connection closed before finishing releases the claim.
+// Settles the claim exactly once, before any response bytes are flushed: the
+// first res.json or res.end is held until the claim is settled, then sent, so
+// a client retrying the moment it receives the answer finds the settled row. A
+// connection closed before the response finished releases the claim.
 function settleClaimOnResponse(res: Response, owner: ClaimOwner): void {
   let isSettled = false;
+  function holdUntilSettled(
+    response: Omit<SettledResponse, 'isFinished' | 'statusCode'>,
+    send: () => void,
+  ): void {
+    isSettled = true;
+    const { statusCode } = res;
+    void settleClaim(owner, { ...response, isFinished: true, statusCode }).then(
+      () => {
+        if (!res.writableEnded && !res.destroyed) {
+          send();
+        }
+      },
+    );
+  }
   const originalJson = res.json.bind(res);
   res.json = (body: unknown) => {
     if (isSettled) {
       return originalJson(body);
     }
-    isSettled = true;
-    void settleClaim(owner, res.statusCode, body, true).then(() => {
-      if (!res.headersSent && !res.destroyed) {
-        originalJson(body);
-      }
+    holdUntilSettled({ hasJsonBody: true, responseBody: body }, () => {
+      originalJson(body);
     });
     return res;
   };
-  function settleOnce(isFinished: boolean): void {
+  const originalEnd = res.end.bind(res) as (...args: unknown[]) => Response;
+  res.end = ((...args: unknown[]) => {
     if (isSettled) {
-      return;
+      return originalEnd(...args);
     }
-    isSettled = true;
-    void settleClaim(owner, res.statusCode, null, isFinished);
-  }
-  res.on('finish', () => {
-    settleOnce(true);
-  });
+    holdUntilSettled({ hasJsonBody: false, responseBody: null }, () => {
+      originalEnd(...args);
+    });
+    return res;
+  }) as Response['end'];
   res.on('close', () => {
-    settleOnce(res.writableFinished);
+    if (!isSettled) {
+      isSettled = true;
+      void releaseClaim(owner, res.statusCode);
+    }
   });
 }
 
@@ -297,7 +324,7 @@ function createIdempotencyMiddleware(idempotencyRepo: IdempotencyRepo) {
       return;
     }
     if (hasClientLeft()) {
-      await releaseClaim(owner, HTTP.STATUS.REQUEST_TIMEOUT);
+      await releaseClaim(owner, undefined);
       return;
     }
     settleClaimOnResponse(res, owner);

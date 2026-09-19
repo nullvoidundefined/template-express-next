@@ -27,6 +27,7 @@ interface IdempotencyClaimInput {
 type IdempotencyKeyStatus = 'completed' | 'in_progress';
 
 interface StoredIdempotencyKey {
+  hasJsonBody: boolean;
   requestBodyHash: string | null;
   requestMethod: string | null;
   requestPath: string | null;
@@ -36,6 +37,7 @@ interface StoredIdempotencyKey {
 }
 
 interface IdempotencyKeyRow {
+  has_json_body: boolean;
   request_body_hash: string | null;
   request_method: string | null;
   request_path: string | null;
@@ -45,6 +47,7 @@ interface IdempotencyKeyRow {
 }
 
 const IDEMPOTENCY_KEY_COLUMNS = [
+  'has_json_body',
   'request_body_hash',
   'request_method',
   'request_path',
@@ -57,6 +60,7 @@ const IDEMPOTENCY_TTL_HOURS = 24;
 
 function toStoredIdempotencyKey(row: IdempotencyKeyRow): StoredIdempotencyKey {
   return {
+    hasJsonBody: row.has_json_body,
     requestBodyHash: row.request_body_hash,
     requestMethod: row.request_method,
     requestPath: row.request_path,
@@ -87,6 +91,7 @@ function createIdempotencyRepo({ query }: IdempotencyRepoDeps) {
              request_path = EXCLUDED.request_path,
              request_body_hash = EXCLUDED.request_body_hash,
              status = 'in_progress',
+             has_json_body = false,
              status_code = NULL,
              response_body = NULL,
              created_at = NOW()
@@ -118,23 +123,26 @@ function createIdempotencyRepo({ query }: IdempotencyRepoDeps) {
     return row ? toStoredIdempotencyKey(row) : null;
   }
 
+  // A JSON body, including a JSON null, is stored as a JSON value; a response
+  // without one stores SQL NULL with has_json_body false.
   async function completeKey(
     key: string,
     userId: string,
     statusCode: number,
     responseBody: unknown,
+    hasJsonBody: boolean,
   ): Promise<void> {
     await query(
       `UPDATE idempotency_keys
-       SET status = 'completed', status_code = $3, response_body = $4
+       SET status = 'completed', status_code = $3, response_body = $4,
+           has_json_body = $5
        WHERE key = $1 AND user_id = $2 AND status = 'in_progress'`,
       [
         key,
         userId,
         statusCode,
-        responseBody === undefined || responseBody === null
-          ? null
-          : JSON.stringify(responseBody),
+        hasJsonBody ? JSON.stringify(responseBody ?? null) : null,
+        hasJsonBody,
       ],
     );
   }

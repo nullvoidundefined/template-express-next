@@ -115,6 +115,47 @@ describe('idempotency repository', () => {
       });
     });
 
+    it('maps has_json_body to hasJsonBody for both kinds of body', async () => {
+      mockQuery.mockResolvedValueOnce(
+        mockResult([
+          {
+            has_json_body: false,
+            request_body_hash: 'd'.repeat(64),
+            request_method: 'POST',
+            request_path: '/v1/posts',
+            response_body: null,
+            status: 'completed',
+            status_code: 200,
+          },
+        ]),
+      );
+      mockQuery.mockResolvedValueOnce(
+        mockResult([
+          {
+            has_json_body: true,
+            request_body_hash: 'd'.repeat(64),
+            request_method: 'POST',
+            request_path: '/v1/posts',
+            response_body: null,
+            status: 'completed',
+            status_code: 200,
+          },
+        ]),
+      );
+
+      const withoutJsonBody = await repo.findKey('key-1', userId);
+      const withJsonNull = await repo.findKey('key-2', userId);
+
+      expect(withoutJsonBody).toMatchObject({
+        hasJsonBody: false,
+        responseBody: null,
+      });
+      expect(withJsonNull).toMatchObject({
+        hasJsonBody: true,
+        responseBody: null,
+      });
+    });
+
     it('returns null when no row exists for the key and user', async () => {
       mockQuery.mockResolvedValue(mockResult([]));
 
