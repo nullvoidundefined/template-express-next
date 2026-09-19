@@ -33,6 +33,8 @@ Web client:
 - **C-4**: When the portal answers 400 `BILLING_NO_ACCOUNT`, the dashboard shows "You don't have a billing account yet. Upgrade to create one." in an element with `role="alert"`, and the buttons are enabled again. Any other failure of either request shows "Something went wrong. Please try again." in the same way.
 - **C-5**: `/dashboard?checkout=success` shows "Thanks, your checkout is complete." and `/dashboard?checkout=canceled` shows "Checkout canceled. You have not been charged." in an element with `role="status"`; any other value, or none, shows no banner. `?portal=returned` shows no banner.
 - **C-6**: The Next.js middleware no longer lists the nonexistent `/settings` route.
+- **C-8** (added after review): The guard against a second request does not depend on React having re-rendered: two activations dispatched before any re-render (the real TanStack hook reports pending only on a later macrotask) still send exactly one request. Once the browser is being sent to Stripe, both buttons stay disabled and the activated one keeps reading "Redirecting" until the page unloads, so no click during the navigation starts a second session.
+- **C-9** (added after review): When a request fails, keyboard focus moves to the error alert (which is focusable with `tabIndex={-1}`), so a keyboard user whose focused button was disabled is not left on the page body.
 - **C-7**: Both buttons are keyboard operable, have accessible names, and the banner and error messages are announced (the roles above); the dashboard keeps exactly one `<h1>`.
 
 ## Interface
