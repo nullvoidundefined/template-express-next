@@ -12,26 +12,26 @@ Severity: P0 is a correctness or security defect that ships in every fork; P1 is
 
 ## Summary
 
-| # | Finding | Severity | Area |
-|---|---|---|---|
-| 1 | Failed Stripe webhook events are never retried | P0 | Billing |
-| 2 | Idempotency middleware caches error responses and races on concurrent retries | P0 | Middleware |
-| 3 | Stripe checkout and portal redirect to `/settings`, a page that does not exist | P1 | Billing |
-| 4 | Two browser-to-API paths; the direct cross-origin one breaks the cookie gate on Railway | P1 | Frontend |
-| 5 | Sentry initializes after Express is imported, and user context carries the email | P1 | Observability |
-| 6 | Request ID is not bound to a context, so most log lines, Sentry, and outbound calls lack it | P1 | Observability |
-| 7 | Password-reset email is sent fire-and-forget in the request process | P1 | Auth |
-| 8 | Worker loads dotenv after its imports read the environment, and has no health probes | P1 | Worker |
-| 9 | Recipient email addresses are written to logs | P1 | Privacy |
-| 10 | No generated type contract; `openapi.yaml` and `@repo/types` are hand-maintained | P2 | Contract |
-| 11 | Inconsistent success envelope (`{ user }` versus `{ data }`) | P2 | API |
-| 12 | Only one deployable has a Dockerfile, and it runs as root with dev dependencies | P2 | Deployment |
-| 13 | CI has no aggregate `ci` check, skips integration tests, and has no drift or checklist gates | P2 | CI |
-| 14 | Rate limiting is disabled under test, so no test proves it limits | P2 | Testing |
-| 15 | Circuit breaker and R2 client have no caller, and the breaker is one global key | P2 | Integrations |
-| 16 | Outbound clients lack timeouts and telemetry (R-346) | P2 | Integrations |
-| 17 | Table names predate R-334 | P3 | Data model |
-| 18 | Smaller correctness and hygiene items | P3 | Various |
+| #   | Finding                                                                                      | Severity | Area          |
+| --- | -------------------------------------------------------------------------------------------- | -------- | ------------- |
+| 1   | Failed Stripe webhook events are never retried                                               | P0       | Billing       |
+| 2   | Idempotency middleware caches error responses and races on concurrent retries                | P0       | Middleware    |
+| 3   | Stripe checkout and portal redirect to `/settings`, a page that does not exist               | P1       | Billing       |
+| 4   | Two browser-to-API paths; the direct cross-origin one breaks the cookie gate on Railway      | P1       | Frontend      |
+| 5   | Sentry initializes after Express is imported, and user context carries the email             | P1       | Observability |
+| 6   | Request ID is not bound to a context, so most log lines, Sentry, and outbound calls lack it  | P1       | Observability |
+| 7   | Password-reset email is sent fire-and-forget in the request process                          | P1       | Auth          |
+| 8   | Worker loads dotenv after its imports read the environment, and has no health probes         | P1       | Worker        |
+| 9   | Recipient email addresses are written to logs                                                | P1       | Privacy       |
+| 10  | No generated type contract; `openapi.yaml` and `@repo/types` are hand-maintained             | P2       | Contract      |
+| 11  | Inconsistent success envelope (`{ user }` versus `{ data }`)                                 | P2       | API           |
+| 12  | Only one deployable has a Dockerfile, and it runs as root with dev dependencies              | P2       | Deployment    |
+| 13  | CI has no aggregate `ci` check, skips integration tests, and has no drift or checklist gates | P2       | CI            |
+| 14  | Rate limiting is disabled under test, so no test proves it limits                            | P2       | Testing       |
+| 15  | Circuit breaker and R2 client have no caller, and the breaker is one global key              | P2       | Integrations  |
+| 16  | Outbound clients lack timeouts and telemetry (R-346)                                         | P2       | Integrations  |
+| 17  | Table names predate R-334                                                                    | P3       | Data model    |
+| 18  | Smaller correctness and hygiene items                                                        | P3       | Various       |
 
 ## Findings
 
@@ -43,7 +43,7 @@ Evidence, `apps/server/src/repositories/billingRepository.ts:108-114`:
 `INSERT INTO stripe_events (event_id, event_type, status)
  VALUES ($1, $2, 'processing')
  ON CONFLICT (event_id) DO NOTHING
- RETURNING event_id`
+ RETURNING event_id`;
 ```
 
 and `apps/server/src/handlers/billing/webhookHandler.ts`:
@@ -77,7 +77,9 @@ const originalJson = res.json.bind(res);
 res.json = (body: unknown) => {
   void idempotencyRepo
     .store(key, userId, res.statusCode, body)
-    .catch((err: unknown) => { logger.error({ err }, 'Failed to store idempotency key'); });
+    .catch((err: unknown) => {
+      logger.error({ err }, 'Failed to store idempotency key');
+    });
   return originalJson(body);
 };
 ```
