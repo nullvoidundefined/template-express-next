@@ -10,12 +10,12 @@ import {
   createErrorResponse,
 } from 'app/constants/errorCodesConstants.js';
 import { logger } from 'app/services/loggerService.js';
-import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
 
 const AUTH_RATE_LIMIT_MAX = 10;
 const GLOBAL_RATE_LIMIT_MAX = 100;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const RATE_LIMIT_WINDOW_MS = 900_000; // 15 minutes
 
 // Sent as the 429 body so throttled clients get the same { code, error }
 // envelope as every other error response.
@@ -55,7 +55,7 @@ function createRateLimiter({
   max,
   prefix,
   shouldSkip = () => isTest,
-}: RateLimiterOptions): RateLimitRequestHandler {
+}: RateLimiterOptions) {
   return rateLimit({
     legacyHeaders: false,
     max,
