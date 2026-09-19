@@ -40,14 +40,17 @@ components:
       required: false
       description: >
         Opaque client-generated key, at most 255 characters (longer answers 400
-        INPUT_VALIDATION_ERROR). On an authenticated POST/PUT the key is bound
-        to the request's method, path, and body: a retry of a completed request
+        INPUT_VALIDATION_ERROR). It applies to every POST/PUT from an
+        authenticated user, including auth routes called with a live session.
+        The key is bound to the request's method, URL (path and query string),
+        and body: a retry of a completed request
         within 24 hours replays its stored status and body without running the
         handler; a retry while the first request is still running answers 409
         IDEMPOTENCY_REQUEST_IN_PROGRESS; reusing the key for a different
         request answers 422 IDEMPOTENCY_KEY_REUSED. A response of 500 or above,
         a 408 timeout, or a dropped connection releases the key so a retry runs
-        again.
+        again. A replay carries the stored status and body only, not the first
+        response's headers (such as Set-Cookie).
       schema:
         type: string
         maxLength: 255
@@ -588,6 +591,7 @@ paths:
         - cookieAuth: []
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
           description: Portal session URL
@@ -609,3 +613,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyRequestInProgress'
+        '422':
+          $ref: '#/components/responses/IdempotencyKeyReused'
