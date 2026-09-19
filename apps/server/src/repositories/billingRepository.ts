@@ -13,6 +13,11 @@ interface BillingRepoDeps {
   ) => Promise<QueryResult<T>>;
 }
 
+// A 'processing' claim older than this belongs to a handler that died: a
+// healthy webhook handler finishes in seconds, so ten minutes leaves a wide
+// margin before a live claim could be taken over.
+const STRIPE_EVENT_CLAIM_STALE_SECONDS = 600;
+
 const SUBSCRIPTION_COLUMNS = [
   'cancel_at_period_end',
   'created_at',
@@ -100,16 +105,25 @@ function createBillingRepo({ query }: BillingRepoDeps) {
     );
   }
 
+  // Claims an event for processing. A new event is inserted; an existing row is
+  // re-claimed only when its last attempt failed (Stripe is redelivering after
+  // our 500) or its 'processing' claim is older than the stale window (the
+  // handler died mid-processing). ON CONFLICT ... DO UPDATE locks the row, so
+  // two concurrent deliveries can never both claim it.
   async function claimStripeEvent(
     eventId: string,
     eventType: string,
   ): Promise<boolean> {
     const result = await query(
-      `INSERT INTO stripe_events (event_id, event_type, status)
-     VALUES ($1, $2, 'processing')
-     ON CONFLICT (event_id) DO NOTHING
+      `INSERT INTO stripe_events (event_id, event_type, status, attempted_at)
+     VALUES ($1, $2, 'processing', NOW())
+     ON CONFLICT (event_id) DO UPDATE
+       SET status = 'processing', attempted_at = NOW()
+       WHERE stripe_events.status = 'failed'
+          OR (stripe_events.status = 'processing'
+              AND stripe_events.attempted_at < NOW() - $3 * INTERVAL '1 second')
      RETURNING event_id`,
-      [eventId, eventType],
+      [eventId, eventType, STRIPE_EVENT_CLAIM_STALE_SECONDS],
     );
     return result.rowCount !== null && result.rowCount > 0;
   }
