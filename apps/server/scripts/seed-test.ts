@@ -12,8 +12,8 @@
  * using the shared pool, and keep every insert idempotent with
  * `ON CONFLICT DO NOTHING`.
  */
-import { pool, query } from 'app/db/pool/pool.js';
-import { logger } from 'app/utils/logs/logger.js';
+import { pool, query } from 'app/database/databasePool.js';
+import { logger } from 'app/services/loggerService.js';
 
 async function seedTestData(): Promise<void> {
   // Verify connectivity so a misconfigured DATABASE_URL fails loudly here,

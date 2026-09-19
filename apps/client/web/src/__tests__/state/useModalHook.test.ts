@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { useModalStore } from '../../state/useModal';
+import { useModalStore } from '../../state/useModalHook';
 
 describe('useModalStore', () => {
   afterEach(() => {
