@@ -7,7 +7,7 @@
  * the browser is leaving for Stripe; a failure is announced in an alert that
  * receives focus.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/Button/Button';
 import { ApiError } from '@/services/apiService';
@@ -49,25 +49,28 @@ function BillingActions() {
     }
   }, [errorMessage]);
 
-  async function handleRedirectToStripe(
-    kind: BillingRequestKind,
-    request: () => Promise<string>,
-  ) {
-    if (isRequestInFlightRef.current || redirectingTo !== null) {
-      return;
-    }
-    isRequestInFlightRef.current = true;
-    setErrorMessage(null);
-    try {
-      const url = await request();
-      // Hold the buttons disabled until the page unloads for Stripe.
-      setRedirectingTo(kind);
-      window.location.assign(url);
-    } catch (err) {
-      isRequestInFlightRef.current = false;
-      setErrorMessage(describeBillingError(err));
-    }
-  }
+  const handleRedirectToStripe = useCallback(
+    async function redirectToStripe(
+      kind: BillingRequestKind,
+      request: () => Promise<string>,
+    ) {
+      if (isRequestInFlightRef.current || redirectingTo !== null) {
+        return;
+      }
+      isRequestInFlightRef.current = true;
+      setErrorMessage(null);
+      try {
+        const url = await request();
+        // Hold the buttons disabled until the page unloads for Stripe.
+        setRedirectingTo(kind);
+        window.location.assign(url);
+      } catch (err) {
+        isRequestInFlightRef.current = false;
+        setErrorMessage(describeBillingError(err));
+      }
+    },
+    [redirectingTo],
+  );
 
   return (
     <section
