@@ -1,125 +1,151 @@
 import {
-  ERROR_CODES,
-  createErrorResponse,
-} from 'app/constants/errorCodesConstants.js';
-import {
+  AUTH_RATE_LIMIT_MAX,
+  GLOBAL_RATE_LIMIT_MAX,
   authRateLimiter,
+  createRateLimiter,
   rateLimiter,
 } from 'app/middleware/rateLimiterMiddleware.js';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import { type Server, createServer } from 'node:http';
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-function buildApp(limiter: ReturnType<typeof rateLimit>) {
-  const app = express();
-  app.use(limiter);
-  app.get('/test', (_req, res) => res.json({ ok: true }));
-  return app;
+let server: Server | undefined;
+
+async function startServer(app: express.Express): Promise<Server> {
+  const listeningServer = createServer(app);
+  server = listeningServer;
+  await new Promise<void>((resolve, reject) => {
+    listeningServer.once('error', reject);
+    listeningServer.listen(0, '127.0.0.1', () => {
+      listeningServer.removeListener('error', reject);
+      resolve();
+    });
+  });
+  return listeningServer;
 }
 
-describe('rateLimiter', () => {
-  it('allows requests under the limit', async () => {
-    const app = buildApp(rateLimiter);
-    const res = await request(app).get('/test');
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true });
-  });
-
-  it('is skipped under NODE_ENV=test so standard rate-limit headers are absent', async () => {
-    // The limiter uses skip: () => isTest. Skipped requests do not get headers.
-    const app = buildApp(rateLimiter);
-    const res = await request(app).get('/test');
-    expect(res.status).toBe(200);
-    expect(res.headers['ratelimit-limit']).toBeUndefined();
-  });
-
-  it('does not set legacy X-RateLimit headers', async () => {
-    const app = buildApp(rateLimiter);
-    const res = await request(app).get('/test');
-    expect(res.headers['x-ratelimit-limit']).toBeUndefined();
-  });
-
-  it('does not throttle requests in NODE_ENV=test (no 429 after exceeding limit)', async () => {
-    // NODE_ENV is 'test' during vitest runs. The rateLimiter skips under test
-    // so hammering the endpoint must never return 429.
-    const app = buildApp(rateLimiter);
-
-    const responses = await Promise.all(
-      Array.from({ length: 110 }, () => request(app).get('/test')),
-    );
-
-    const throttled = responses.filter((r) => r.status === 429);
-    expect(throttled).toHaveLength(0);
+afterEach(async () => {
+  const listeningServer = server;
+  server = undefined;
+  if (!listeningServer?.listening) return;
+  await new Promise<void>((resolve, reject) => {
+    listeningServer.close((error) => {
+      if (error) reject(error);
+      else resolve();
+    });
   });
 });
 
-describe('authRateLimiter', () => {
-  it('allows requests under the limit', async () => {
-    const app = buildApp(authRateLimiter);
-    const res = await request(app).get('/test');
-    expect(res.status).toBe(200);
-  });
+describe('rate limiter middleware', () => {
+  it('allows two requests and throttles the third at the configured limit', async () => {
+    const app = express();
+    app.use(
+      createRateLimiter({ max: 2, prefix: 'test', shouldSkip: () => false }),
+    );
+    app.get('/', (_req, res) => res.sendStatus(200));
+    const listeningServer = await startServer(app);
 
-  it('does not block requests under NODE_ENV=test (skip path)', async () => {
-    // The limiter uses skip: () => isTest. Under test, no throttling occurs.
-    const app = buildApp(authRateLimiter);
-
-    for (let i = 0; i < 10; i++) {
-      await request(app).get('/test');
+    for (const expectedStatus of [200, 200, 429]) {
+      const response = await request(listeningServer).get('/');
+      expect(response.status).toBe(expectedStatus);
     }
-
-    const blocked = await request(app).get('/test');
-    expect(blocked.status).toBe(200);
-  });
-});
-
-describe('throttling enforcement (non-skip path)', () => {
-  it('returns 429 after the limit is exceeded when skip is false', async () => {
-    // Build a fresh limiter with skip: () => false to exercise the real enforcement path.
-    // max: 2 means the 3rd request must be rejected with 429.
-    const strictLimiter = rateLimit({
-      max: 2,
-      skip: () => false,
-      standardHeaders: true,
-      windowMs: 60_000,
-    });
-
-    const app = buildApp(strictLimiter);
-
-    const first = await request(app).get('/test');
-    expect(first.status).toBe(200);
-
-    const second = await request(app).get('/test');
-    expect(second.status).toBe(200);
-
-    const third = await request(app).get('/test');
-    expect(third.status).toBe(429);
   });
 
-  it('returns the { code, error } envelope on the 429 response', async () => {
-    // Mirrors the message the shipped limiters carry so the throttled body is
-    // verified against the shared error contract.
-    const strictLimiter = rateLimit({
-      max: 1,
-      message: createErrorResponse(
-        ERROR_CODES.RATE_LIMIT.EXCEEDED,
-        'Too many requests, please try again later.',
-      ),
-      skip: () => false,
-      standardHeaders: true,
-      windowMs: 60_000,
-    });
-
-    const app = buildApp(strictLimiter);
-
-    await request(app).get('/test');
-    const blocked = await request(app).get('/test');
-
-    expect(blocked.status).toBe(429);
-    expect(blocked.body.code).toBe('RATE_LIMIT_EXCEEDED');
-    expect(blocked.body.error).toBe(
-      'Too many requests, please try again later.',
+  it('returns the shipped error envelope when throttled', async () => {
+    const app = express();
+    app.use(
+      createRateLimiter({ max: 1, prefix: 'test', shouldSkip: () => false }),
     );
+    app.get('/', (_req, res) => res.sendStatus(200));
+    const listeningServer = await startServer(app);
+
+    await request(listeningServer).get('/').expect(200);
+    const response = await request(listeningServer).get('/');
+
+    expect(response.status).toBe(429);
+    expect(response.body).toEqual({
+      code: 'RATE_LIMIT_EXCEEDED',
+      error: 'Too many requests, please try again later.',
+    });
+  });
+
+  it('counts down standard headers without exposing legacy headers', async () => {
+    const app = express();
+    app.use(
+      createRateLimiter({ max: 2, prefix: 'test', shouldSkip: () => false }),
+    );
+    app.get('/', (_req, res) => res.sendStatus(200));
+    const listeningServer = await startServer(app);
+
+    for (const [index, remaining] of ['1', '0', '0'].entries()) {
+      const response = await request(listeningServer).get('/');
+      expect(response.status).toBe(index < 2 ? 200 : 429);
+      expect(response.headers['ratelimit-limit']).toBe('2');
+      expect(response.headers['ratelimit-remaining']).toBe(remaining);
+      expect(response.headers['x-ratelimit-limit']).toBeUndefined();
+    }
+  });
+
+  it('keeps counters independent for separate factory calls', async () => {
+    const app = express();
+    const firstLimiter = createRateLimiter({
+      max: 1,
+      prefix: 'test',
+      shouldSkip: () => false,
+    });
+    const secondLimiter = createRateLimiter({
+      max: 1,
+      prefix: 'test',
+      shouldSkip: () => false,
+    });
+    app.get('/first', firstLimiter, (_req, res) => res.sendStatus(200));
+    app.get('/second', secondLimiter, (_req, res) => res.sendStatus(200));
+    const listeningServer = await startServer(app);
+
+    await request(listeningServer).get('/first').expect(200);
+    await request(listeningServer).get('/first').expect(429);
+    await request(listeningServer).get('/second').expect(200);
+    await request(listeningServer).get('/second').expect(429);
+  });
+
+  it('skips the shipped global limiter under NODE_ENV=test', async () => {
+    expect(GLOBAL_RATE_LIMIT_MAX).toBe(100);
+    const app = express();
+    app.use(rateLimiter);
+    app.get('/', (_req, res) => res.sendStatus(200));
+    const listeningServer = await startServer(app);
+
+    for (let count = 0; count < GLOBAL_RATE_LIMIT_MAX + 1; count += 1) {
+      const response = await request(listeningServer).get('/');
+      expect(response.status).toBe(200);
+      expect(response.headers['ratelimit-limit']).toBeUndefined();
+    }
+  });
+
+  it('skips the shipped auth limiter under NODE_ENV=test', async () => {
+    expect(AUTH_RATE_LIMIT_MAX).toBe(10);
+    const app = express();
+    app.use(authRateLimiter);
+    app.get('/', (_req, res) => res.sendStatus(200));
+    const listeningServer = await startServer(app);
+
+    for (let count = 0; count < AUTH_RATE_LIMIT_MAX + 1; count += 1) {
+      const response = await request(listeningServer).get('/');
+      expect(response.status).toBe(200);
+    }
+  });
+
+  it('defaults to skipping factory limiters under NODE_ENV=test', async () => {
+    const app = express();
+    app.use(createRateLimiter({ max: 1, prefix: 'test' }));
+    app.get('/', (_req, res) => res.sendStatus(200));
+    const listeningServer = await startServer(app);
+
+    for (let count = 0; count < 2; count += 1) {
+      const response = await request(listeningServer).get('/');
+      expect(response.status).toBe(200);
+      expect(response.headers['ratelimit-limit']).toBeUndefined();
+    }
   });
 });
