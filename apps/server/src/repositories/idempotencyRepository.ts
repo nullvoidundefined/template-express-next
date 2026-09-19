@@ -59,14 +59,23 @@ const IDEMPOTENCY_KEY_COLUMNS = [
 const IDEMPOTENCY_TTL_HOURS = 24;
 
 function toStoredIdempotencyKey(row: IdempotencyKeyRow): StoredIdempotencyKey {
+  const {
+    has_json_body: hasJsonBody,
+    request_body_hash: requestBodyHash,
+    request_method: requestMethod,
+    request_path: requestPath,
+    response_body: responseBody,
+    status,
+    status_code: statusCode,
+  } = row;
   return {
-    hasJsonBody: row.has_json_body,
-    requestBodyHash: row.request_body_hash,
-    requestMethod: row.request_method,
-    requestPath: row.request_path,
-    responseBody: row.response_body,
-    status: row.status,
-    statusCode: row.status_code,
+    hasJsonBody,
+    requestBodyHash,
+    requestMethod,
+    requestPath,
+    responseBody,
+    status,
+    statusCode,
   };
 }
 

@@ -39,11 +39,15 @@ interface ClaimOwner {
   userId: string;
 }
 
-function buildRequestFingerprint(req: Request): RequestFingerprint {
+// Typed with an unknown body so the parsed JSON is never read as any.
+function buildRequestFingerprint(
+  req: Request<unknown, unknown, unknown>,
+): RequestFingerprint {
+  const { body, method, originalUrl } = req;
   return {
-    requestBodyHash: hashToken(JSON.stringify(req.body ?? {})),
-    requestMethod: req.method,
-    requestPath: req.originalUrl,
+    requestBodyHash: hashToken(JSON.stringify(body ?? {})),
+    requestMethod: method,
+    requestPath: originalUrl,
   };
 }
 
@@ -54,11 +58,15 @@ function isSameRequest(
   fingerprint: RequestFingerprint,
 ): boolean {
   const { requestBodyHash, requestMethod, requestPath } = stored;
+  const {
+    requestBodyHash: bodyHash,
+    requestMethod: method,
+    requestPath: path,
+  } = fingerprint;
   return (
-    (requestMethod === null || requestMethod === fingerprint.requestMethod) &&
-    (requestPath === null || requestPath === fingerprint.requestPath) &&
-    (requestBodyHash === null ||
-      requestBodyHash === fingerprint.requestBodyHash)
+    (requestMethod === null || requestMethod === method) &&
+    (requestPath === null || requestPath === path) &&
+    (requestBodyHash === null || requestBodyHash === bodyHash)
   );
 }
 
@@ -223,7 +231,8 @@ function settleClaimOnResponse(res: Response, owner: ClaimOwner): void {
     const { statusCode } = res;
     void settleClaim(owner, { ...response, isFinished: true, statusCode }).then(
       () => {
-        if (!res.writableEnded && !res.destroyed) {
+        const { destroyed, writableEnded } = res;
+        if (!writableEnded && !destroyed) {
           send();
         }
       },
@@ -281,11 +290,12 @@ function createIdempotencyMiddleware(idempotencyRepo: IdempotencyRepo) {
     res: Response,
     next: NextFunction,
   ): Promise<void> {
-    const key = req.headers['idempotency-key'];
+    const { headers, id, method, user } = req;
+    const key = headers['idempotency-key'];
     if (
       typeof key !== 'string' ||
-      !REPLAYABLE_METHODS.includes(req.method) ||
-      !req.user
+      !REPLAYABLE_METHODS.includes(method) ||
+      !user
     ) {
       next();
       return;
@@ -298,8 +308,8 @@ function createIdempotencyMiddleware(idempotencyRepo: IdempotencyRepo) {
     const owner: ClaimOwner = {
       idempotencyRepo,
       key,
-      requestId: typeof req.id === 'string' ? req.id : undefined,
-      userId: req.user.id,
+      requestId: typeof id === 'string' ? id : undefined,
+      userId: user.id,
     };
     const fingerprint = buildRequestFingerprint(req);
     const hasClientLeft = trackClientDisconnect(res);
